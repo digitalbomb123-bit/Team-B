@@ -1,0 +1,272 @@
+import 'package:flutter/material.dart';
+import '../../characters/character_definition.dart';
+import '../../characters/character_registry.dart';
+import 'health_bar.dart';
+
+/// Top HUD layer displaying health, score, kills, and pause menu.
+class GameHud extends StatelessWidget {
+  final double currentHealth;
+  final double maxHealth;
+  final double currentFuel;
+  final double maxFuel;
+  final int kills;
+  final int deaths;
+  final int characterId;
+  final String playerName;
+  final int totalPlayers;
+  final VoidCallback onPausePressed;
+
+  const GameHud({
+    super.key,
+    required this.currentHealth,
+    required this.maxHealth,
+    this.currentFuel = 100.0,
+    this.maxFuel = 100.0,
+    required this.kills,
+    required this.deaths,
+    required this.characterId,
+    required this.playerName,
+    this.totalPlayers = 10,
+    required this.onPausePressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final character = CharacterRegistry.getById(characterId);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // 1. TOP-LEFT: Health, Avatar, and Player Info
+            _buildPlayerCard(character),
+
+            // 2. TOP-CENTER: Kills, Deaths, Score & Match Info
+            _buildScoreBadge(),
+
+            // 3. TOP-RIGHT: Pause & Settings Button
+            _buildPauseButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlayerCard(CharacterDefinition character) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Face Avatar Thumbnail
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF1E293B),
+              border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                character.faceAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // Name & Health Bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    playerName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      character.callsign,
+                      style: const TextStyle(
+                        color: Color(0xFF38BDF8),
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              HudHealthBar(
+                currentHealth: currentHealth,
+                maxHealth: maxHealth,
+                width: 130,
+                height: 12,
+              ),
+              const SizedBox(height: 3),
+              _buildFuelBar(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFuelBar() {
+    final ratio = (currentFuel / maxFuel).clamp(0.0, 1.0);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.rocket_launch_rounded, color: Color(0xFFF97316), size: 10),
+        const SizedBox(width: 4),
+        Container(
+          width: 116,
+          height: 6,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: const Color(0xFFF97316).withValues(alpha: 0.5), width: 1),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: ratio,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF7A00), Color(0xFFFFB800)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF7A00).withValues(alpha: 0.6),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScoreBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Kills
+          const Icon(Icons.gps_fixed_rounded, color: Color(0xFFEF4444), size: 16),
+          const SizedBox(width: 4),
+          Text(
+            '$kills',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+          Container(width: 1, height: 16, color: Colors.white24),
+          const SizedBox(width: 12),
+
+          // Deaths
+          const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 16),
+          const SizedBox(width: 4),
+          Text(
+            '$deaths',
+            style: const TextStyle(
+              color: Color(0xFFCBD5E1),
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+          Container(width: 1, height: 16, color: Colors.white24),
+          const SizedBox(width: 12),
+
+          // Player Count
+          const Icon(Icons.people_alt_rounded, color: Color(0xFF38BDF8), size: 16),
+          const SizedBox(width: 4),
+          Text(
+            '$totalPlayers / 10',
+            style: const TextStyle(
+              color: Color(0xFF38BDF8),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPauseButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPausePressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
+            ),
+          ),
+          child: const Icon(
+            Icons.pause_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}

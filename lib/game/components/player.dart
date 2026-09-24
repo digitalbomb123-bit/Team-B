@@ -1,0 +1,602 @@
+import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:flame/components.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import '../../characters/character_definition.dart';
+import '../../characters/character_registry.dart';
+import 'weapon.dart';
+
+enum PlayerAnimState {
+  idle,
+  run,
+  jump,
+  fall,
+  shoot,
+  death,
+}
+
+/// Player component representing both local hero and remote/bot soldiers.
+/// Modular architecture separates BODY, FACE, and WEAPON.
+class PlayerComponent extends PositionComponent with HasGameReference {
+  // Identifiers
+  final String playerId;
+  final int characterId;
+  final String name;
+  final bool isLocal;
+
+  // Movement Constants (Configurable, centralized)
+  static const double moveSpeed = 240.0;
+  static const double jumpForce = -520.0;
+  static const double gravity = 1100.0;
+  static const double airControl = 0.85;
+  static const double maxFallSpeed = 750.0;
+
+  // Physics & State
+  Vector2 velocity = Vector2.zero();
+  double health = 100.0;
+  double maxHealth = 100.0;
+  double facingDirection = 1.0; // 1.0 = right, -1.0 = left
+  double aimAngle = 0.0; // Radians
+  PlayerAnimState currentAnimation = PlayerAnimState.idle;
+  bool isShooting = false;
+  bool isDead = false;
+  bool isGrounded = false;
+
+  // Weapon & Combat
+  final Weapon weapon = Weapon();
+  double muzzleFlashTimer = 0.0;
+  double respawnCountdown = 0.0;
+  static const double respawnDuration = 3.0;
+
+  // Jetpack & Flight System
+  double jetpackFuel = 100.0;
+  static const double maxJetpackFuel = 100.0;
+  static const double jetpackBurnRate = 30.0; // Fuel burnt per sec (~3.3s full burn)
+  static const double jetpackRechargeRate = 22.0; // Fuel recharged per sec (~4.5s full refill)
+  static const double jetpackThrust = -2200.0; // Upward acceleration countering gravity
+  static const double maxFlySpeed = -420.0; // Terminal upward flight speed
+  bool isFlying = false;
+  double _jetpackCooldownTimer = 0.0;
+  static const double jetpackRechargeDelay = 0.5; // Refill delay in seconds
+
+  // Visual Assets & Overlay
+  Sprite? faceSprite;
+  late final CharacterDefinition characterDef;
+
+  // Animation time accumulators
+  double _animTime = 0.0;
+
+  // Collision Box Dimensions (Logical coordinates)
+  static const double playerWidth = 36.0;
+  static const double playerHeight = 58.0;
+
+  // Callbacks
+  void Function(PlayerComponent player)? onDeath;
+  void Function(PlayerComponent player)? onRespawn;
+
+  PlayerComponent({
+    required this.playerId,
+    required this.characterId,
+    required this.name,
+    required Vector2 position,
+    this.isLocal = false,
+    this.onDeath,
+    this.onRespawn,
+  }) : super(
+          position: position,
+          size: Vector2(playerWidth, playerHeight),
+          anchor: Anchor.bottomCenter,
+        ) {
+    characterDef = CharacterRegistry.getById(characterId);
+  }
+
+  Rect get collisionRect => Rect.fromCenter(
+        center: Offset(position.x, position.y - playerHeight / 2),
+        width: playerWidth,
+        height: playerHeight,
+      );
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    _loadFaceSprite();
+  }
+
+  void _loadFaceSprite() async {
+    try {
+      final byteData = await rootBundle.load(characterDef.faceAsset);
+      final codec =
+          await ui.instantiateImageCodec(byteData.buffer.asUint8List());
+      final frameInfo = await codec.getNextFrame();
+      faceSprite = Sprite(frameInfo.image);
+    } catch (_) {
+      // Clean fallback face renders when faceSprite is null
+    }
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    weapon.update(dt);
+    if (muzzleFlashTimer > 0) {
+      muzzleFlashTimer -= dt;
+    }
+
+    if (isDead) {
+      currentAnimation = PlayerAnimState.death;
+      isFlying = false;
+      if (respawnCountdown > 0) {
+        respawnCountdown -= dt;
+        if (respawnCountdown <= 0) {
+          respawn();
+        }
+      }
+      return;
+    }
+
+    _animTime += dt;
+
+    // --- JETPACK FLIGHT & AUTOMATIC FUEL REFILL ---
+    if (isFlying && jetpackFuel > 0) {
+      jetpackFuel = max(0.0, jetpackFuel - jetpackBurnRate * dt);
+      _jetpackCooldownTimer = jetpackRechargeDelay;
+      velocity.y = max(maxFlySpeed, velocity.y + jetpackThrust * dt);
+      isGrounded = false;
+      if (jetpackFuel <= 0) {
+        isFlying = false;
+      }
+    } else {
+      isFlying = false;
+      if (_jetpackCooldownTimer > 0) {
+        _jetpackCooldownTimer -= dt;
+      } else if (jetpackFuel < maxJetpackFuel) {
+        // Automatically refill fuel over time!
+        jetpackFuel = min(maxJetpackFuel, jetpackFuel + jetpackRechargeRate * dt);
+      }
+    }
+
+    // Determine animation state based on physics
+    if (!isGrounded) {
+      currentAnimation = velocity.y < 0 ? PlayerAnimState.jump : PlayerAnimState.fall;
+    } else if (isShooting) {
+      currentAnimation = PlayerAnimState.shoot;
+    } else if (velocity.x.abs() > 10.0) {
+      currentAnimation = PlayerAnimState.run;
+    } else {
+      currentAnimation = PlayerAnimState.idle;
+    }
+  }
+
+  /// Activate or deactivate jetpack flight
+  void setFlying(bool flying) {
+    if (isDead) {
+      isFlying = false;
+      return;
+    }
+    if (flying && jetpackFuel > 0) {
+      isFlying = true;
+      isGrounded = false;
+    } else {
+      isFlying = false;
+    }
+  }
+
+  /// Apply horizontal input movement
+  void move(double directionX) {
+    if (isDead) return;
+
+    final control = isGrounded ? 1.0 : airControl;
+    velocity.x = directionX * moveSpeed * control;
+
+    // Face the direction of aiming or moving
+    if (aimAngle.abs() > pi / 2) {
+      facingDirection = -1.0;
+    } else {
+      facingDirection = 1.0;
+    }
+  }
+
+  /// Jump if grounded, or fire jetpack if already airborne
+  void jump() {
+    if (isDead) return;
+    if (isGrounded) {
+      velocity.y = jumpForce;
+      isGrounded = false;
+    } else {
+      setFlying(true);
+    }
+  }
+
+  /// Update aiming angle from controls
+  void updateAim(double angle) {
+    aimAngle = angle;
+    if (cos(aimAngle) < -0.05) {
+      facingDirection = -1.0;
+    } else if (cos(aimAngle) > 0.05) {
+      facingDirection = 1.0;
+    }
+  }
+
+  /// Take damage from incoming bullets
+  void takeDamage(double amount, {String? attackerId}) {
+    if (isDead) return;
+
+    health = max(0.0, health - amount);
+    if (health <= 0.0) {
+      die();
+    }
+  }
+
+  /// Trigger death
+  void die() {
+    if (isDead) return;
+    isDead = true;
+    health = 0.0;
+    velocity.setZero();
+    currentAnimation = PlayerAnimState.death;
+    respawnCountdown = respawnDuration;
+    onDeath?.call(this);
+  }
+
+  /// Respawn player with full health
+  void respawn({Vector2? newPosition}) {
+    isDead = false;
+    health = maxHealth;
+    velocity.setZero();
+    currentAnimation = PlayerAnimState.idle;
+    if (newPosition != null) {
+      position.setFrom(newPosition);
+    }
+    onRespawn?.call(this);
+  }
+
+  Vector2 getMuzzleWorldPosition() {
+    final armPivot = Vector2(position.x, position.y - 32);
+    final offset = Vector2(cos(aimAngle), sin(aimAngle)) * weapon.barrelLength;
+    return armPivot + offset;
+  }
+
+  // ==========================================
+  // MODULAR RENDERING: BODY, FACE, WEAPON
+  // ==========================================
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+
+    canvas.save();
+
+    // Translate local origin to the soldier's feet (Anchor.bottomCenter)
+    canvas.translate(size.x / 2, size.y);
+
+    // Render nameplate and mini health bar (unflipped)
+    _renderNameAndHealthBar(canvas);
+
+    // Apply facing flip
+    canvas.scale(facingDirection, 1.0);
+
+    if (isDead) {
+      // Death pose / knocked down
+      canvas.save();
+      canvas.translate(0, -12);
+      canvas.rotate(-pi / 2);
+      _renderBody(canvas);
+      _renderFace(canvas);
+      _renderWeapon(canvas);
+      canvas.restore();
+    } else {
+      // Alive rendering in 3 distinct layers:
+      _renderBody(canvas);
+      _renderFace(canvas);
+      _renderWeapon(canvas);
+    }
+
+    canvas.restore();
+  }
+
+  /// 1. BODY RENDERING (Shared across all characters)
+  void _renderBody(Canvas canvas) {
+    final paintArmor = Paint()..color = const Color(0xFF2D3748); // Tactical dark slate
+    final paintVest = Paint()..color = const Color(0xFF3B4D3C); // Military camo green
+    final paintStraps = Paint()..color = const Color(0xFF1A202C); // Black straps
+    final paintBoots = Paint()..color = const Color(0xFF171923); // Combat boots
+    final paintSkin = Paint()..color = const Color(0xFFE2B897); // Skin tone hands/neck
+
+    // --- LEGS & ANIMATION ---
+    double leg1Angle = 0.0;
+    double leg2Angle = 0.0;
+
+    switch (currentAnimation) {
+      case PlayerAnimState.run:
+        leg1Angle = sin(_animTime * 12.0) * 0.45;
+        leg2Angle = -leg1Angle;
+        break;
+      case PlayerAnimState.jump:
+        leg1Angle = 0.3;
+        leg2Angle = -0.2;
+        break;
+      case PlayerAnimState.fall:
+        leg1Angle = -0.25;
+        leg2Angle = 0.35;
+        break;
+      default:
+        leg1Angle = 0.05;
+        leg2Angle = -0.05;
+        break;
+    }
+
+    // Left / Back Leg
+    canvas.save();
+    canvas.translate(-4, -20);
+    canvas.rotate(leg2Angle);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-3, 0, 7, 20), const Radius.circular(3)),
+      paintArmor,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-3, 13, 8, 8), const Radius.circular(2)),
+      paintBoots,
+    );
+    canvas.restore();
+
+    // Right / Front Leg
+    canvas.save();
+    canvas.translate(4, -20);
+    canvas.rotate(leg1Angle);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-4, 0, 7, 20), const Radius.circular(3)),
+      paintArmor,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-4, 13, 8, 8), const Radius.circular(2)),
+      paintBoots,
+    );
+    canvas.restore();
+
+    // --- TORSO / CHEST ---
+    // Torso breathing bob
+    final bob = (currentAnimation == PlayerAnimState.idle) ? sin(_animTime * 4.0) * 1.0 : 0.0;
+
+    canvas.save();
+    canvas.translate(0, -22 + bob);
+
+    // --- JETPACK BACKPACK & THRUST EXHAUST ---
+    final paintJetpack = Paint()..color = const Color(0xFF1E293B);
+    final paintJetpackDetail = Paint()..color = const Color(0xFF38BDF8);
+    // Jetpack canister mounted on the back
+    final jetpackRect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(-15, -19, 7, 18),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(jetpackRect, paintJetpack);
+
+    // Jetpack exhaust nozzle
+    final nozzleRect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(-14, -1, 5, 3),
+      const Radius.circular(1),
+    );
+    canvas.drawRRect(nozzleRect, paintJetpackDetail);
+
+    // Fiery rocket flame exhaust when flying!
+    if (isFlying && jetpackFuel > 0) {
+      final flicker = sin(_animTime * 35.0) * 3.5;
+      final flameLen = 16.0 + flicker;
+
+      // Outer plasma flame (orange/red glow)
+      final paintOuterFlame = Paint()
+        ..color = const Color(0xFFFF5722)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+      final outerPath = Path()
+        ..moveTo(-15, 2)
+        ..lineTo(-9, 2)
+        ..lineTo(-12, 2 + flameLen)
+        ..close();
+      canvas.drawPath(outerPath, paintOuterFlame);
+
+      // Inner white/yellow fiery core
+      final paintInnerFlame = Paint()..color = const Color(0xFFFFEB3B);
+      final innerPath = Path()
+        ..moveTo(-14, 2)
+        ..lineTo(-10, 2)
+        ..lineTo(-12, 2 + flameLen * 0.6)
+        ..close();
+      canvas.drawPath(innerPath, paintInnerFlame);
+    }
+
+    // Tactical Body Vest
+    final vestRect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(-10, -20, 20, 22),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(vestRect, paintVest);
+
+    // Chest armor plate
+    final plateRect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(-7, -18, 14, 12),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(plateRect, paintArmor);
+
+    // Tactical Harness Straps
+    canvas.drawLine(const Offset(-8, -20), const Offset(-2, -6), Paint()..color = paintStraps.color..strokeWidth = 2);
+    canvas.drawLine(const Offset(8, -20), const Offset(2, -6), Paint()..color = paintStraps.color..strokeWidth = 2);
+
+    // Tactical Belt
+    canvas.drawRect(const Rect.fromLTWH(-10, 0, 20, 3), paintStraps);
+
+    // Neck anchor
+    canvas.drawRect(const Rect.fromLTWH(-3, -24, 6, 5), paintSkin);
+
+    canvas.restore();
+  }
+
+  /// 2. FACE RENDERING (Independently rendered overlay from PNG asset)
+  void _renderFace(Canvas canvas) {
+    final bob = (currentAnimation == PlayerAnimState.idle) ? sin(_animTime * 4.0) * 1.0 : 0.0;
+    const double headCenterY = -48.0;
+    const double headSize = 28.0;
+
+    canvas.save();
+    canvas.translate(0, headCenterY + bob);
+
+    if (faceSprite != null) {
+      // Draw the independent face PNG cleanly centered over the head anchor
+      faceSprite!.render(
+        canvas,
+        position: Vector2(-headSize / 2, -headSize / 2),
+        size: Vector2(headSize, headSize),
+      );
+    } else {
+      // Fallback clean soldier face if sprite loading is pending
+      final paintSkin = Paint()..color = const Color(0xFFF3C099);
+      final paintHelmet = Paint()..color = const Color(0xFF2C3E50);
+      canvas.drawCircle(Offset.zero, 11, paintSkin);
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset.zero, radius: 12),
+        pi,
+        pi,
+        true,
+        paintHelmet,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  /// 3. WEAPON RENDERING (Rifle aimed toward aimAngle)
+  void _renderWeapon(Canvas canvas) {
+    final bob = (currentAnimation == PlayerAnimState.idle) ? sin(_animTime * 4.0) * 1.0 : 0.0;
+    const double shoulderY = -34.0;
+
+    canvas.save();
+    canvas.translate(2, shoulderY + bob);
+
+    // Weapon angle relative to facing direction
+    final effectiveAngle = facingDirection > 0 ? aimAngle : pi - aimAngle;
+    canvas.rotate(effectiveAngle);
+
+    final paintMetal = Paint()..color = const Color(0xFF1E293B);
+    final paintGunStock = Paint()..color = const Color(0xFF475569);
+    final paintGunDetail = Paint()..color = const Color(0xFF0F172A);
+
+    // Rifle Receiver & Stock
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-6, -3, 14, 6), const Radius.circular(2)),
+      paintGunStock,
+    );
+
+    // Rifle Barrel
+    canvas.drawRect(const Rect.fromLTWH(8, -2, 18, 4), paintMetal);
+
+    // Ammo Magazine
+    canvas.save();
+    canvas.rotate(0.2);
+    canvas.drawRect(const Rect.fromLTWH(2, 2, 4, 8), paintGunDetail);
+    canvas.restore();
+
+    // Rifle Scope / Sight
+    canvas.drawRect(const Rect.fromLTWH(2, -5, 8, 2), paintGunDetail);
+
+    // Soldier Hand gripping weapon
+    final paintHand = Paint()..color = const Color(0xFFE2B897);
+    canvas.drawCircle(const Offset(4, 0), 3.5, paintHand);
+
+    // Muzzle Flash Effect
+    if (muzzleFlashTimer > 0) {
+      final paintFlash = Paint()
+        ..color = const Color(0xFFFFCC00).withValues(alpha: 0.9)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawCircle(const Offset(27, 0), 7, paintFlash);
+
+      final paintCore = Paint()..color = Colors.white;
+      canvas.drawCircle(const Offset(27, 0), 3, paintCore);
+    }
+
+    canvas.restore();
+  }
+
+  /// Render Name Tag and Mini Health Bar above the player's head
+  void _renderNameAndHealthBar(Canvas canvas) {
+    const double barWidth = 38.0;
+    const double barHeight = 4.5;
+    const double topOffset = -66.0;
+
+    // Health Bar Background
+    final paintBg = Paint()..color = Colors.black.withValues(alpha: 0.65);
+    final rectBg = Rect.fromCenter(
+      center: const Offset(0, topOffset),
+      width: barWidth,
+      height: barHeight,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rectBg, const Radius.circular(2)),
+      paintBg,
+    );
+
+    // Current Health Fill
+    final healthRatio = (health / maxHealth).clamp(0.0, 1.0);
+    final fillWidth = barWidth * healthRatio;
+    final healthColor = healthRatio > 0.5
+        ? const Color(0xFF22C55E) // Green
+        : (healthRatio > 0.25 ? const Color(0xFFEAB308) : const Color(0xFFEF4444)); // Yellow / Red
+
+    final paintFill = Paint()..color = healthColor;
+    final rectFill = Rect.fromLTWH(
+      -barWidth / 2,
+      topOffset - barHeight / 2,
+      fillWidth,
+      barHeight,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rectFill, const Radius.circular(2)),
+      paintFill,
+    );
+
+    // Mini Jetpack Fuel Bar (Directly below health bar)
+    const double fuelOffset = -59.5;
+    final fuelRectBg = Rect.fromCenter(
+      center: const Offset(0, fuelOffset),
+      width: barWidth,
+      height: 2.2,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(fuelRectBg, const Radius.circular(1)),
+      paintBg,
+    );
+    final fuelRatio = (jetpackFuel / maxJetpackFuel).clamp(0.0, 1.0);
+    final fuelFillWidth = barWidth * fuelRatio;
+    final paintFuel = Paint()..color = const Color(0xFFF97316); // Jetpack flame orange
+    final rectFuelFill = Rect.fromLTWH(
+      -barWidth / 2,
+      fuelOffset - 1.1,
+      fuelFillWidth,
+      2.2,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rectFuelFill, const Radius.circular(1)),
+      paintFuel,
+    );
+
+    // Name Text Tag
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: name,
+        style: TextStyle(
+          color: isLocal ? const Color(0xFF67E8F9) : Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          shadows: const [
+            Shadow(color: Colors.black, blurRadius: 3),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    textPainter.paint(
+      canvas,
+      Offset(-textPainter.width / 2, topOffset - 14),
+    );
+  }
+}
