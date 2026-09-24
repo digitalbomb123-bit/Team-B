@@ -1,10 +1,9 @@
 FROM dart:stable AS build
 
 WORKDIR /app
-COPY pubspec.* ./
-RUN dart pub get
 
-COPY . .
+# The standalone WebSocket server only uses standard dart:io & dart:convert (no Flutter required)
+COPY server/ ./server/
 RUN dart compile exe server/bin/server.dart -o /app/server_bin
 
 FROM debian:bookworm-slim
