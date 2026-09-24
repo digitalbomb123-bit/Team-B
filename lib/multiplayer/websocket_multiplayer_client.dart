@@ -22,7 +22,7 @@ class WebSocketMultiplayerClient implements MultiplayerClient {
   bool _isConnected = false;
 
   WebSocketMultiplayerClient({
-    this.serverUrl = 'ws://localhost:8081',
+    this.serverUrl = 'wss://team-b-6hro.onrender.com',
   });
 
   bool get isConnected => _isConnected;

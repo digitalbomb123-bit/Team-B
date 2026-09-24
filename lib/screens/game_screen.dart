@@ -31,7 +31,7 @@ class GameScreen extends StatefulWidget {
     this.botCount = 4,
     this.isOnlineMultiplayer = false,
     this.roomId = 'ARENA-1',
-    this.serverUrl = 'ws://localhost:8081',
+    this.serverUrl = 'wss://team-b-6hro.onrender.com',
     this.customMultiplayerClient,
   });
 

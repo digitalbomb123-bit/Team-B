@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../characters/character_definition.dart';
 import '../characters/character_registry.dart';
@@ -15,25 +14,18 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
+  static const String defaultServerUrl = 'wss://team-b-6hro.onrender.com';
+
   int _selectedCharacterId = 1;
   final TextEditingController _nameController =
       TextEditingController(text: 'Soldier');
   final TextEditingController _roomController =
       TextEditingController(text: 'ARENA-1');
   final TextEditingController _serverController =
-      TextEditingController(text: 'ws://localhost:8081');
+      TextEditingController(text: defaultServerUrl);
 
   bool _isOnlineMultiplayer = false;
   int _botCount = 4; // Default 4 bots (total 5 players)
-
-  @override
-  void initState() {
-    super.initState();
-    if (kIsWeb && Uri.base.scheme == 'https') {
-      // Browser Mixed Content policy requires wss:// on HTTPS hosting (e.g. GitHub Pages)
-      _serverController.text = 'wss://';
-    }
-  }
 
   @override
   void dispose() {
@@ -53,7 +45,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         : _roomController.text.trim().toUpperCase();
 
     final server = _serverController.text.trim().isEmpty
-        ? 'ws://localhost:8081'
+        ? defaultServerUrl
         : _serverController.text.trim();
 
     Navigator.of(context).pushReplacement(
@@ -463,7 +455,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                               ),
                               const SizedBox(width: 5),
                               const Text(
-                                'WebSocket Relay Ready (:8081)',
+                                'Cloud WebSocket Relay (Live on Render)',
                                 style: TextStyle(
                                   color: Color(0xFF10B981),
                                   fontSize: 10,
