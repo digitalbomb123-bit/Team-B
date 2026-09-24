@@ -55,6 +55,9 @@ class _GameScreenState extends State<GameScreen> {
   final Set<LogicalKeyboardKey> _pressedKeys = {};
   final FocusNode _focusNode = FocusNode();
 
+  @visibleForTesting
+  InputController get inputController => _inputController;
+
   @override
   void initState() {
     super.initState();
@@ -166,10 +169,11 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   // ==========================================
-  // DESKTOP MOUSE AIM & SHOOT
+  // DESKTOP MOUSE AIM HOVER & FOCUS
   // ==========================================
   void _handlePointerHover(PointerHoverEvent event, Size screenSize) {
-    // Calculate aim relative to screen center
+    if (_inputController.usingTouchControls) return;
+    // Calculate aim relative to screen center for desktop mouse hover
     final center = Offset(screenSize.width / 2, screenSize.height / 2);
     final dx = event.position.dx - center.dx;
     final dy = event.position.dy - center.dy;
@@ -177,25 +181,9 @@ class _GameScreenState extends State<GameScreen> {
     _inputController.setAimAngle(angle);
   }
 
-  void _handlePointerDown(PointerDownEvent event, Size screenSize) {
-    // Focus keyboard input on click
+  void _handlePointerDown(PointerDownEvent event) {
+    // Focus keyboard input on tap/click without triggering fire
     _focusNode.requestFocus();
-
-    // Aim towards click
-    final center = Offset(screenSize.width / 2, screenSize.height / 2);
-    final dx = event.position.dx - center.dx;
-    final dy = event.position.dy - center.dy;
-    final angle = atan2(dy, dx);
-    _inputController.setAimAngle(angle);
-
-    // Left mouse click shoots
-    if (event.buttons == kPrimaryMouseButton) {
-      _inputController.setShooting(true);
-    }
-  }
-
-  void _handlePointerUp(PointerUpEvent event) {
-    _inputController.setShooting(false);
   }
 
   void _showPauseDialog() {
@@ -310,8 +298,7 @@ class _GameScreenState extends State<GameScreen> {
               return MouseRegion(
                 onHover: (e) => _handlePointerHover(e, size),
                 child: Listener(
-                  onPointerDown: (e) => _handlePointerDown(e, size),
-                  onPointerUp: _handlePointerUp,
+                  onPointerDown: _handlePointerDown,
                   child: Stack(
                     children: [
                       // 1. Core Flame Game

@@ -33,15 +33,16 @@ class VirtualJoystick extends StatefulWidget {
 class _VirtualJoystickState extends State<VirtualJoystick> {
   Offset _dragOffset = Offset.zero;
 
-  void _handlePanUpdate(DragUpdateDetails details) {
+  void _updateFromLocalPosition(Offset localPosition) {
+    final center = Offset(widget.radius, widget.radius);
+    final rawOffset = localPosition - center;
+    final distance = rawOffset.distance;
+    final clampedOffset = distance > widget.radius
+        ? Offset.fromDirection(rawOffset.direction, widget.radius)
+        : rawOffset;
+
     setState(() {
-      final newOffset = _dragOffset + details.delta;
-      final distance = newOffset.distance;
-      if (distance > widget.radius) {
-        _dragOffset = Offset.fromDirection(newOffset.direction, widget.radius);
-      } else {
-        _dragOffset = newOffset;
-      }
+      _dragOffset = clampedOffset;
     });
 
     final normalized = Offset(
@@ -57,11 +58,13 @@ class _VirtualJoystickState extends State<VirtualJoystick> {
       if (dist > 8.0) {
         final angle = atan2(_dragOffset.dy, _dragOffset.dx);
         widget.onAimChanged?.call(angle, true);
+      } else {
+        widget.onAimChanged?.call(0.0, false);
       }
     }
   }
 
-  void _handlePanEnd(DragEndDetails details) {
+  void _handlePanEnd() {
     setState(() {
       _dragOffset = Offset.zero;
     });
@@ -83,18 +86,10 @@ class _VirtualJoystickState extends State<VirtualJoystick> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPanDown: (d) => _handlePanUpdate(DragUpdateDetails(globalPosition: d.globalPosition, delta: Offset.zero)),
-      onPanUpdate: _handlePanUpdate,
-      onPanEnd: _handlePanEnd,
-      onPanCancel: () {
-        setState(() => _dragOffset = Offset.zero);
-        widget.onVectorChanged?.call(Offset.zero);
-        widget.onDirectionChanged?.call(0.0);
-        if (widget.mode == VirtualJoystickMode.aimAndFire) {
-          widget.onAimChanged?.call(0.0, false);
-        }
-        widget.onReleased?.call();
-      },
+      onPanDown: (d) => _updateFromLocalPosition(d.localPosition),
+      onPanUpdate: (d) => _updateFromLocalPosition(d.localPosition),
+      onPanEnd: (_) => _handlePanEnd(),
+      onPanCancel: _handlePanEnd,
       child: Container(
         width: size,
         height: size,
