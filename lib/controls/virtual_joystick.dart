@@ -95,16 +95,16 @@ class _VirtualJoystickState extends State<VirtualJoystick> {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.black.withValues(alpha: 0.38),
+          color: Colors.black.withValues(alpha: 0.15),
           border: Border.all(
-            color: primaryColor.withValues(alpha: 0.5),
-            width: 2.5,
+            color: primaryColor.withValues(alpha: 0.25),
+            width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: primaryColor.withValues(alpha: 0.18),
-              blurRadius: 14,
-              spreadRadius: 2,
+              color: primaryColor.withValues(alpha: 0.06),
+              blurRadius: 8,
+              spreadRadius: 1,
             ),
           ],
         ),
@@ -116,15 +116,15 @@ class _VirtualJoystickState extends State<VirtualJoystick> {
               // Left / Right / Fly indicators
               Positioned(
                 left: 6,
-                child: Icon(Icons.arrow_left, color: Colors.white.withValues(alpha: 0.4), size: 22),
+                child: Icon(Icons.arrow_left, color: Colors.white.withValues(alpha: 0.25), size: 22),
               ),
               Positioned(
                 right: 6,
-                child: Icon(Icons.arrow_right, color: Colors.white.withValues(alpha: 0.4), size: 22),
+                child: Icon(Icons.arrow_right, color: Colors.white.withValues(alpha: 0.25), size: 22),
               ),
               Positioned(
                 top: 6,
-                child: Icon(Icons.keyboard_arrow_up, color: const Color(0xFF38BDF8).withValues(alpha: 0.6), size: 22),
+                child: Icon(Icons.keyboard_arrow_up, color: const Color(0xFF38BDF8).withValues(alpha: 0.35), size: 22),
               ),
             ] else ...[
               // Aim Crosshair Rings
@@ -133,12 +133,12 @@ class _VirtualJoystickState extends State<VirtualJoystick> {
                 height: size * 0.6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: primaryColor.withValues(alpha: 0.25), width: 1.5),
+                  border: Border.all(color: primaryColor.withValues(alpha: 0.15), width: 1.2),
                 ),
               ),
               Icon(
                 Icons.adjust_rounded,
-                color: primaryColor.withValues(alpha: 0.3),
+                color: primaryColor.withValues(alpha: 0.2),
                 size: 28,
               ),
             ],
@@ -153,22 +153,22 @@ class _VirtualJoystickState extends State<VirtualJoystick> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      primaryColor,
-                      secondaryColor,
+                      primaryColor.withValues(alpha: 0.38),
+                      secondaryColor.withValues(alpha: 0.38),
                     ],
                   ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 2),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 8,
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 6,
                     ),
                   ],
                 ),
                 child: Center(
                   child: Icon(
                     isAim ? Icons.my_location_rounded : Icons.drag_indicator,
-                    color: Colors.white,
+                    color: Colors.white.withValues(alpha: 0.75),
                     size: 22,
                   ),
                 ),

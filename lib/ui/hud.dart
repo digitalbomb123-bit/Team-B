@@ -65,15 +65,8 @@ class GameHud extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 1. TOP-LEFT: Health, Avatar, Player Info, Weapon & Fart Bomb
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildPlayerCard(character),
-                _buildWeaponIndicator(),
-                _buildFartBombIndicator(),
-              ],
-            ),
+            // 1. TOP-LEFT: Health, Avatar, Player Info
+            _buildPlayerCard(character),
 
             // 2. TOP-RIGHT: Kill Count, Match Timer, Scope Zoom & Tactical Pause
             Row(
@@ -92,149 +85,15 @@ class GameHud extends StatelessWidget {
     );
   }
 
-  Widget _buildWeaponIndicator() {
-    return GestureDetector(
-      onTap: onReloadPressed,
-      child: Container(
-        margin: const EdgeInsets.only(left: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isReloading ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8).withValues(alpha: 0.6),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: (isReloading ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8)).withValues(alpha: 0.25),
-              blurRadius: 6,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  weaponName.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    '${weaponZoom.toStringAsFixed(1)}x',
-                    style: const TextStyle(
-                      color: Color(0xFF38BDF8),
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            if (isReloading)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(
-                    width: 8,
-                    height: 8,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      valueColor: AlwaysStoppedAnimation(Color(0xFFF59E0B)),
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'RELOAD ${(reloadProgress * 100).toInt()}%',
-                    style: const TextStyle(
-                      color: Color(0xFFFBBF24),
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              )
-            else
-              Text(
-                'AMMO: $currentAmmo / $maxAmmo',
-                style: TextStyle(
-                  color: currentAmmo <= 2 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
-                  fontSize: 9.0,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFartBombIndicator() {
-    if (fartBombCount <= 0) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(left: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF84CC16), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF84CC16).withValues(alpha: 0.4),
-            blurRadius: 10,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/images/fart_bomb.png',
-            width: 20,
-            height: 20,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Text('💨', style: TextStyle(fontSize: 14)),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            'x$fartBombCount',
-            style: const TextStyle(
-              color: Color(0xFFBEF264),
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPlayerCard(CharacterDefinition character) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+        color: const Color(0xFF0F172A).withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
-          width: 1.5,
+          color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
+          width: 1.2,
         ),
       ),
       child: Row(
@@ -314,9 +173,9 @@ class GameHud extends StatelessWidget {
           width: 116,
           height: 6,
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: iconColor.withValues(alpha: 0.6), width: 1),
+            border: Border.all(color: iconColor.withValues(alpha: 0.5), width: 1),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
@@ -344,13 +203,13 @@ class GameHud extends StatelessWidget {
       onTap: onScoreboardPressed,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+          color: const Color(0xFF0F172A).withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
-            width: 1.5,
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+            width: 1.2,
           ),
         ),
         child: Row(
@@ -426,11 +285,11 @@ class GameHud extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 1.5,
+              color: Colors.white.withValues(alpha: 0.2),
+              width: 1.2,
             ),
           ),
           child: const Icon(
@@ -457,16 +316,16 @@ class GameHud extends StatelessWidget {
           height: 38,
           padding: const EdgeInsets.symmetric(horizontal: 7),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: const Color(0xFF38BDF8).withValues(alpha: 0.7),
-              width: 1.5,
+              color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+              width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
-                blurRadius: 6,
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                blurRadius: 4,
               ),
             ],
           ),

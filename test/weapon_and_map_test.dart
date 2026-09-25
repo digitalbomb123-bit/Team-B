@@ -3,9 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:team_b_shooter/game/camera/game_camera.dart';
 import 'package:team_b_shooter/game/components/bullet.dart';
 import 'package:team_b_shooter/game/components/gun_pickup.dart';
+import 'package:team_b_shooter/game/components/enemy_radar_indicator.dart';
+import 'package:team_b_shooter/game/components/platform.dart';
+import 'package:team_b_shooter/game/components/player.dart';
 import 'package:team_b_shooter/game/components/scenery_elements.dart';
 import 'package:team_b_shooter/game/components/weapon.dart';
 import 'package:team_b_shooter/game/components/wood_cabin.dart';
+import 'package:team_b_shooter/game/systems/collision_system.dart';
 import 'package:team_b_shooter/game/world/arena.dart';
 
 void main() {
@@ -162,6 +166,19 @@ void main() {
       expect(bushes.length, greaterThanOrEqualTo(10));
     });
 
+    test('Arena ground has bottom gaps/pits for fall hazards', () {
+      final arena = ArenaComponent();
+      final groundPlatforms = arena.platforms
+          .where((p) => p.platformType == PlatformType.ground)
+          .toList();
+
+      // Ground is split into multiple sections separated by gaps
+      expect(groundPlatforms.length, greaterThanOrEqualTo(3));
+      // First section ends before second begins, confirming gap
+      expect(groundPlatforms[0].position.x + groundPlatforms[0].size.x,
+          lessThan(groundPlatforms[1].position.x));
+    });
+
     test('GunPickupComponent initializes with correct weapon and availability', () {
       final pickup = GunPickupComponent(
         weaponType: WeaponType.awp,
@@ -169,6 +186,60 @@ void main() {
       );
       expect(pickup.weaponType, WeaponType.awp);
       expect(pickup.isAvailable, isTrue);
+    });
+
+    test('Player falling into abyss below threshold height dies', () {
+      final player = PlayerComponent(
+        playerId: 'p1',
+        name: 'Player',
+        characterId: 1,
+        position: Vector2(700, 1150), // in the gap, below abyss threshold
+        isLocal: true,
+      );
+
+      expect(player.isDead, isFalse);
+      CollisionSystem.updatePlayerPhysics(
+        player: player,
+        platforms: [],
+        arenaWidth: 2400,
+        arenaHeight: 1200,
+        dt: 0.016,
+      );
+      expect(player.isDead, isTrue);
+      expect(player.health, 0.0);
+    });
+
+    test('EnemyRadarIndicator detects alive enemies within radius', () {
+      final localPlayer = PlayerComponent(
+        playerId: 'local',
+        name: 'Local',
+        characterId: 1,
+        position: Vector2(500, 500),
+        isLocal: true,
+      );
+      final nearbyEnemy = PlayerComponent(
+        playerId: 'enemy1',
+        name: 'Enemy1',
+        characterId: 2,
+        position: Vector2(800, 500), // 300px away, within 900px radius
+        isLocal: false,
+      );
+      final distantEnemy = PlayerComponent(
+        playerId: 'enemy2',
+        name: 'Enemy2',
+        characterId: 3,
+        position: Vector2(2000, 500), // 1500px away, outside radius
+        isLocal: false,
+      );
+
+      expect(
+        EnemyRadarIndicatorComponent.shouldTrackEnemy(localPlayer, nearbyEnemy),
+        isTrue,
+      );
+      expect(
+        EnemyRadarIndicatorComponent.shouldTrackEnemy(localPlayer, distantEnemy),
+        isFalse,
+      );
     });
   });
 }

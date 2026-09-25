@@ -33,11 +33,11 @@ class HudHealthBar extends StatelessWidget {
       height: height,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+        color: const Color(0xFF0F172A).withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
-          width: 1.5,
+          color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(

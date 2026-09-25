@@ -224,7 +224,7 @@ void main() {
       inputController.dispose();
     });
 
-    testWidgets('GameHud renders Fart Bomb indicator badge when count > 0', (WidgetTester tester) async {
+    testWidgets('GameHud does not render Fart Bomb indicator at top per user requirements', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -244,8 +244,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Badge showing fart icon and x3 count
-      expect(find.text('x3'), findsOneWidget);
+      // Bomb count is removed from top HUD per user requirements (only visible in mobile control button)
+      expect(find.text('x3'), findsNothing);
     });
   });
 }

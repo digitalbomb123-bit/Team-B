@@ -83,11 +83,14 @@ class CollisionSystem {
       }
     }
 
-    // Floor fallback
-    if (player.position.y >= 1000.0) {
-      player.position.y = 1000.0;
-      player.velocity.y = 0;
-      player.isGrounded = true;
+    // 3. Abyss Fall Death: if player falls below bottom platforms into a gap
+    if (player.position.y >= 1100.0) {
+      player.takeDamage(
+        player.maxHealth,
+        attackerId: 'abyss',
+        attackerName: 'The Abyss',
+        weapon: 'Fall',
+      );
     }
   }
 

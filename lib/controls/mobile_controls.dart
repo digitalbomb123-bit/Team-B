@@ -53,10 +53,10 @@ class _MobileControlsOverlayState extends State<MobileControlsOverlay> {
                   },
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'MOVE / FLY',
                   style: TextStyle(
-                    color: Color(0xFF38BDF8),
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.55),
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
@@ -117,10 +117,10 @@ class _MobileControlsOverlayState extends State<MobileControlsOverlay> {
                       },
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'AIM & FIRE',
                       style: TextStyle(
-                        color: Color(0xFFEF4444),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.55),
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.2,
@@ -185,16 +185,16 @@ class _ActionButtonState extends State<_ActionButton> {
           height: widget.size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: widget.color.withValues(alpha: _isPressed ? 0.9 : 0.65),
+            color: widget.color.withValues(alpha: _isPressed ? 0.6 : 0.35),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.8),
-              width: 2.0,
+              color: Colors.white.withValues(alpha: 0.45),
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withValues(alpha: 0.5),
-                blurRadius: _isPressed ? 16 : 8,
-                spreadRadius: _isPressed ? 3 : 1,
+                color: widget.color.withValues(alpha: 0.2),
+                blurRadius: _isPressed ? 10 : 4,
+                spreadRadius: _isPressed ? 2 : 0,
               ),
             ],
           ),
@@ -203,14 +203,14 @@ class _ActionButtonState extends State<_ActionButton> {
             children: [
               Icon(
                 widget.icon,
-                color: Colors.white,
+                color: Colors.white.withValues(alpha: 0.85),
                 size: widget.size * 0.40,
               ),
               const SizedBox(height: 2),
               Text(
                 widget.label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 8.5,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.8,
@@ -311,25 +311,28 @@ class _FartBombButtonState extends State<_FartBombButton> with SingleTickerProvi
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: isEnabled
-                    ? const LinearGradient(
+                    ? LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFFBEF264), Color(0xFF65A30D)],
+                        colors: [
+                          const Color(0xFFBEF264).withValues(alpha: 0.65),
+                          const Color(0xFF65A30D).withValues(alpha: 0.65),
+                        ],
                       )
                     : null,
-                color: isEnabled ? null : const Color(0xFF1E293B).withValues(alpha: 0.6),
+                color: isEnabled ? null : const Color(0xFF1E293B).withValues(alpha: 0.35),
                 border: Border.all(
                   color: isEnabled
-                      ? Color.lerp(const Color(0xFFBEF264), Colors.white, pulseValue)!
+                      ? Color.lerp(const Color(0xFFBEF264).withValues(alpha: 0.8), Colors.white.withValues(alpha: 0.8), pulseValue)!
                       : Colors.white24,
-                  width: isEnabled ? 2.5 : 1.5,
+                  width: isEnabled ? 2.0 : 1.2,
                 ),
                 boxShadow: isEnabled
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF84CC16).withValues(alpha: 0.5 + pulseValue * 0.35),
-                          blurRadius: 14 + pulseValue * 6,
-                          spreadRadius: 2 + pulseValue * 2,
+                          color: const Color(0xFF84CC16).withValues(alpha: 0.25 + pulseValue * 0.2),
+                          blurRadius: 10 + pulseValue * 4,
+                          spreadRadius: 1 + pulseValue * 1,
                         ),
                       ]
                     : [],

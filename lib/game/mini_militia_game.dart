@@ -6,6 +6,7 @@ import '../controls/input_controller.dart';
 import '../multiplayer/multiplayer_client.dart';
 import '../multiplayer/player_state.dart';
 import 'camera/game_camera.dart';
+import 'components/enemy_radar_indicator.dart';
 import 'components/fart_bomb_pickup.dart';
 import 'components/floating_text.dart';
 import 'components/gun_pickup.dart';
@@ -43,6 +44,19 @@ class MiniMilitiaGame extends FlameGame {
   bool _lastReportedSuperFuel = false;
   bool _initialized = false;
 
+  final List<Timer> _pendingTimers = [];
+
+  void _scheduleTimer(Duration duration, void Function() callback) {
+    late final Timer timer;
+    timer = Timer(duration, () {
+      _pendingTimers.remove(timer);
+      if (isMounted) {
+        callback();
+      }
+    });
+    _pendingTimers.add(timer);
+  }
+
   // Status callbacks for UI
   void Function(double health, double maxHealth)? onHealthChanged;
   void Function(double fuel, double maxFuel, bool isSuperFuel)? onFuelChanged;
@@ -69,7 +83,7 @@ class MiniMilitiaGame extends FlameGame {
   });
 
   @override
-  Color backgroundColor() => const Color(0xFF090D16);
+  Color backgroundColor() => const Color(0xFF0284C7);
 
   @override
   Future<void> onLoad() async {
@@ -127,8 +141,11 @@ class MiniMilitiaGame extends FlameGame {
     spawnJetpackFuelPickup();
     spawnJetpackFuelPickup();
 
-    // 7. Spawn Weapon Pickups on tactical platforms
+    // 7. Spawn Weapon Pickups randomly distributed across platforms
     spawnGunPickups();
+
+    // 8. Add Enemy Directional Radar Indicator
+    await world.add(EnemyRadarIndicatorComponent());
 
     _initialized = true;
   }
@@ -175,38 +192,62 @@ class MiniMilitiaGame extends FlameGame {
       position: Vector2(x, y),
       onCollected: () {
         // Schedule next random fuel pickup after 14 seconds
-        Future.delayed(const Duration(seconds: 14), () {
-          if (isMounted) {
-            spawnJetpackFuelPickup();
-          }
+        _scheduleTimer(const Duration(seconds: 14), () {
+          spawnJetpackFuelPickup();
         });
       },
     );
     world.add(pickup);
   }
 
-  /// Spawn gun pickups across various strategic platforms
+  /// Spawn gun pickups randomly distributed across accessible arena platforms
   void spawnGunPickups() {
-    // High Sniper Tower: AWP (6.0x Scope, 100 DMG)
-    _spawnSpecificGun(WeaponType.awp, Vector2(1180, 435));
-    // Mid Platform Left: AK-47 (2.5x Zoom, 35 DMG)
-    _spawnSpecificGun(WeaponType.ak47, Vector2(680, 615));
-    // Mid Platform Right: M4A1 (3.0x Zoom, 28 DMG)
-    _spawnSpecificGun(WeaponType.m4a1, Vector2(1650, 615));
-    // Low Platform Center: Desert Eagle (2.0x Zoom, 60 DMG)
-    _spawnSpecificGun(WeaponType.desertEagle, Vector2(1200, 795));
-    // Low Platform Left: Uzi (2.0x Zoom, 20 DMG)
-    _spawnSpecificGun(WeaponType.uzi, Vector2(400, 815));
+    final rnd = Random();
+    final validPlatforms = arena.platforms
+        .where((p) => p.size.x >= 140 && p.position.y >= 350 && p.position.y <= 1000)
+        .toList()
+      ..shuffle(rnd);
+
+    if (validPlatforms.isEmpty) return;
+
+    int platformIdx = 0;
+    // 1. Ensure at least one of every gun type is placed at random accessible locations
+    for (final type in WeaponType.values) {
+      if (platformIdx >= validPlatforms.length) platformIdx = 0;
+      final plat = validPlatforms[platformIdx++];
+      final x = plat.position.x + 30 + rnd.nextDouble() * max(20.0, plat.size.x - 60);
+      final y = plat.position.y - 12;
+      _spawnRandomGun(type, Vector2(x, y));
+    }
+
+    // 2. Extra gun spawns across remaining platforms for weapon variety
+    for (int i = 0; i < 3; i++) {
+      if (platformIdx >= validPlatforms.length) platformIdx = 0;
+      final plat = validPlatforms[platformIdx++];
+      final x = plat.position.x + 30 + rnd.nextDouble() * max(20.0, plat.size.x - 60);
+      final y = plat.position.y - 12;
+      final randomType = WeaponType.values[rnd.nextInt(WeaponType.values.length)];
+      _spawnRandomGun(randomType, Vector2(x, y));
+    }
   }
 
-  void _spawnSpecificGun(WeaponType type, Vector2 pos) {
+  void _spawnRandomGun(WeaponType type, Vector2 pos) {
     final pickup = GunPickupComponent(
       position: pos,
       weaponType: type,
       onCollected: () {
-        Future.delayed(const Duration(seconds: 15), () {
-          if (isMounted) {
-            _spawnSpecificGun(type, pos);
+        // Respawn a random weapon on a random accessible platform after 10 seconds
+        _scheduleTimer(const Duration(seconds: 10), () {
+          final rnd = Random();
+          final validPlatforms = arena.platforms
+              .where((p) => p.size.x >= 140 && p.position.y >= 350 && p.position.y <= 1000)
+              .toList();
+          if (validPlatforms.isNotEmpty) {
+            final plat = validPlatforms[rnd.nextInt(validPlatforms.length)];
+            final x = plat.position.x + 30 + rnd.nextDouble() * max(20.0, plat.size.x - 60);
+            final y = plat.position.y - 12;
+            final respawnType = WeaponType.values[rnd.nextInt(WeaponType.values.length)];
+            _spawnRandomGun(respawnType, Vector2(x, y));
           }
         });
       },
@@ -457,6 +498,10 @@ class MiniMilitiaGame extends FlameGame {
 
   @override
   void onRemove() {
+    for (final timer in _pendingTimers) {
+      timer.cancel();
+    }
+    _pendingTimers.clear();
     _playersSub?.cancel();
     _bulletSub?.cancel();
     combatSystem.clear();
