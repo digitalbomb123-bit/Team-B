@@ -87,7 +87,13 @@ class GameHud extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('💨', style: TextStyle(fontSize: 14)),
+          Image.asset(
+            'assets/images/fart_bomb.png',
+            width: 20,
+            height: 20,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Text('💨', style: TextStyle(fontSize: 14)),
+          ),
           const SizedBox(width: 4),
           Text(
             'x$fartBombCount',

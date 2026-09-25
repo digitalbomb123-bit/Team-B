@@ -341,18 +341,24 @@ class _FartBombButtonState extends State<_FartBombButton> with SingleTickerProvi
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        '💨',
-                        style: TextStyle(
-                          fontSize: widget.size * 0.34,
-                          shadows: isEnabled
-                              ? [
-                                  const Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 4,
-                                  ),
-                                ]
-                              : null,
+                      Image.asset(
+                        'assets/images/fart_bomb.png',
+                        width: widget.size * 0.46,
+                        height: widget.size * 0.46,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Text(
+                          '💨',
+                          style: TextStyle(
+                            fontSize: widget.size * 0.34,
+                            shadows: isEnabled
+                                ? [
+                                    const Shadow(
+                                      color: Colors.black54,
+                                      blurRadius: 4,
+                                    ),
+                                  ]
+                                : null,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 1),

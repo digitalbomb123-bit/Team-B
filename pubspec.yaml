@@ -60,6 +60,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/images/
     - assets/characters/
     - assets/images/characters/
     - assets/images/assets/characters/
