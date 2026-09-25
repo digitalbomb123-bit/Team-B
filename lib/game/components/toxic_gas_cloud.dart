@@ -120,7 +120,11 @@ class ToxicGasCloudComponent extends PositionComponent with HasGameReference<Min
       final dist = position.distanceTo(player.position);
       if (dist <= radius + 18.0) {
         // Player is inhaling the toxic gas!
-        player.takeDamage(damagePerTick, attackerId: shooterId);
+        player.takeDamage(
+          damagePerTick,
+          attackerId: shooterId,
+          weapon: 'fart_bomb',
+        );
         player.poisonFlashTimer = 0.35;
 
         // Broadcast damage event so kill tracking and multiplayer stay consistent

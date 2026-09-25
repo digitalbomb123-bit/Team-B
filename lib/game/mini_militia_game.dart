@@ -7,6 +7,7 @@ import '../multiplayer/multiplayer_client.dart';
 import '../multiplayer/player_state.dart';
 import 'camera/game_camera.dart';
 import 'components/fart_bomb_pickup.dart';
+import 'components/floating_text.dart';
 import 'components/jetpack_fuel_pickup.dart';
 import 'components/player.dart';
 import 'systems/collision_system.dart';
@@ -45,6 +46,13 @@ class MiniMilitiaGame extends FlameGame {
   void Function(double fuel, double maxFuel, bool isSuperFuel)? onFuelChanged;
   void Function(int kills, int deaths)? onScoreChanged;
   void Function(int count)? onFartBombCountChanged;
+  void Function({
+    required String killerName,
+    required String victimName,
+    required String weapon,
+    required bool isLocalKiller,
+    required bool isLocalVictim,
+  })? onKillFeedEvent;
 
   void notifyFartBombCountChanged(int count) {
     onFartBombCountChanged?.call(count);
@@ -87,6 +95,7 @@ class MiniMilitiaGame extends FlameGame {
         deaths++;
         onScoreChanged?.call(kills, deaths);
         onHealthChanged?.call(0.0, p.maxHealth);
+        _handlePlayerDeath(p);
       },
       onRespawn: (p) {
         // Pick new random spawn
@@ -171,6 +180,64 @@ class MiniMilitiaGame extends FlameGame {
     return localPlayer.blastFartBomb(this);
   }
 
+  void _handlePlayerDeath(PlayerComponent victim) {
+    final attackerId = victim.lastAttackerId;
+    final weapon = victim.lastAttackerWeapon;
+
+    String killerName = 'Unknown';
+    bool isLocalKiller = false;
+    final isLocalVictim = victim.isLocal;
+
+    if (attackerId != null) {
+      if (attackerId == localPlayer.playerId) {
+        killerName = localPlayer.name;
+        isLocalKiller = true;
+        kills++;
+        onScoreChanged?.call(kills, deaths);
+        world.add(
+          FloatingCombatTextComponent(
+            position: Vector2(victim.position.x, victim.position.y - 35),
+            text: '+1 KILL! 🎯',
+            color: const Color(0xFF38BDF8),
+            fontSize: 16.0,
+          ),
+        );
+      } else if (remotePlayers.containsKey(attackerId)) {
+        killerName = remotePlayers[attackerId]!.name;
+      } else {
+        final attackerState = multiplayerClient.currentPlayers
+            .where((p) => p.playerId == attackerId)
+            .firstOrNull;
+        if (attackerState != null) {
+          killerName = attackerState.name;
+        } else if (victim.lastAttackerName != null &&
+            victim.lastAttackerName!.isNotEmpty) {
+          killerName = victim.lastAttackerName!;
+        }
+      }
+    } else if (victim.lastAttackerName != null &&
+        victim.lastAttackerName!.isNotEmpty) {
+      killerName = victim.lastAttackerName!;
+    }
+
+    world.add(
+      FloatingCombatTextComponent(
+        position: Vector2(victim.position.x, victim.position.y - 15),
+        text: '☠️ $killerName',
+        color: const Color(0xFFEF4444),
+        fontSize: 14.0,
+      ),
+    );
+
+    onKillFeedEvent?.call(
+      killerName: killerName,
+      victimName: victim.name,
+      weapon: weapon,
+      isLocalKiller: isLocalKiller,
+      isLocalVictim: isLocalVictim,
+    );
+  }
+
   void _setupNetworkListeners() {
     // Sync any players already spawned
     _syncRemotePlayers(multiplayerClient.currentPlayers);
@@ -208,18 +275,24 @@ class MiniMilitiaGame extends FlameGame {
           name: state.name,
           position: Vector2(state.x, state.y),
           isLocal: false,
+          onDeath: (victim) => _handlePlayerDeath(victim),
         );
         remotePlayers[state.playerId] = remote;
         world.add(remote);
       } else {
+        final wasDead = remote.isDead;
         // Sync position, aiming, animation, and jetpack flight
         remote.position.setValues(state.x, state.y);
         remote.facingDirection = state.facingDirection;
         remote.aimAngle = state.aimAngle;
         remote.health = state.health;
-        remote.isDead = state.isDead;
         remote.isFlying = state.isFlying;
         remote.jetpackFuel = state.jetpackFuel;
+        if (!wasDead && state.isDead) {
+          remote.die();
+        } else {
+          remote.isDead = state.isDead;
+        }
       }
     }
 

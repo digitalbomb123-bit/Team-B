@@ -12,6 +12,7 @@ import '../multiplayer/mock_multiplayer_client.dart';
 import '../multiplayer/multiplayer_client.dart';
 import '../multiplayer/websocket_multiplayer_client.dart';
 import '../ui/hud.dart';
+import '../ui/kill_feed_overlay.dart';
 import '../ui/orientation_overlay.dart';
 import '../ui/scoreboard_dialog.dart';
 import 'lobby_screen.dart';
@@ -56,6 +57,10 @@ class _GameScreenState extends State<GameScreen> {
   final ValueNotifier<({int kills, int deaths})> _scoreNotifier =
       ValueNotifier((kills: 0, deaths: 0));
   final ValueNotifier<int> _fartBombNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<List<KillFeedEntry>> _killFeedNotifier =
+      ValueNotifier<List<KillFeedEntry>>([]);
+  final ValueNotifier<String?> _lastKillerNameNotifier =
+      ValueNotifier<String?>(null);
   late final ValueNotifier<int> _matchTimerNotifier;
   late int _remainingMatchSeconds;
   Timer? _matchTimer;
@@ -131,6 +136,40 @@ class _GameScreenState extends State<GameScreen> {
           }
         });
       }
+    };
+
+    _game.onKillFeedEvent = ({
+      required String killerName,
+      required String victimName,
+      required String weapon,
+      required bool isLocalKiller,
+      required bool isLocalVictim,
+    }) {
+      if (isLocalVictim) {
+        _lastKillerNameNotifier.value = killerName;
+      }
+      final entry = KillFeedEntry(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        killerName: killerName,
+        victimName: victimName,
+        weapon: weapon,
+        isLocalKiller: isLocalKiller,
+        isLocalVictim: isLocalVictim,
+      );
+
+      final current = List<KillFeedEntry>.from(_killFeedNotifier.value);
+      current.add(entry);
+      if (current.length > 5) {
+        current.removeAt(0);
+      }
+      _killFeedNotifier.value = current;
+
+      Timer(const Duration(milliseconds: 4000), () {
+        if (!mounted) return;
+        final updated = List<KillFeedEntry>.from(_killFeedNotifier.value);
+        updated.removeWhere((e) => e.id == entry.id);
+        _killFeedNotifier.value = updated;
+      });
     };
 
     _inputController.onFartBombPressed = _triggerFartBomb;
@@ -298,6 +337,8 @@ class _GameScreenState extends State<GameScreen> {
     _fuelNotifier.dispose();
     _scoreNotifier.dispose();
     _fartBombNotifier.dispose();
+    _killFeedNotifier.dispose();
+    _lastKillerNameNotifier.dispose();
     super.dispose();
   }
 
@@ -544,44 +585,84 @@ class _GameScreenState extends State<GameScreen> {
                         ),
                       ),
 
-                      // 4. Dead / Respawning Banner
+                      // 4. Kill Feed Announcements ("Who killed who")
+                      Positioned(
+                        top: 66,
+                        right: 16,
+                        child: KillFeedOverlay(
+                          killFeedListenable: _killFeedNotifier,
+                        ),
+                      ),
+
+                      // 5. Dead / Respawning Banner
                       Positioned.fill(
                         child: ValueListenableBuilder<double>(
                           valueListenable: _healthNotifier,
                           builder: (context, health, _) {
                             if (health > 0.0) return const SizedBox.shrink();
-                            return Container(
-                              color: Colors.black.withValues(alpha: 0.65),
-                              child: const Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: Color(0xFFEF4444),
-                                      size: 54,
+                            return ValueListenableBuilder<String?>(
+                              valueListenable: _lastKillerNameNotifier,
+                              builder: (context, killerName, _) {
+                                return Container(
+                                  color: Colors.black.withValues(alpha: 0.65),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: Color(0xFFEF4444),
+                                          size: 54,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'KIA - RESPAWNING...',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 2,
+                                          ),
+                                        ),
+                                        if (killerName != null && killerName.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEF4444).withValues(alpha: 0.22),
+                                              borderRadius: BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: const Color(0xFFEF4444).withValues(alpha: 0.55),
+                                                width: 1.2,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'ELIMINATED BY $killerName',
+                                              style: const TextStyle(
+                                                color: Color(0xFFFCA5A5),
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 1.2,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Returning to combat in 3 seconds',
+                                          style: TextStyle(
+                                            color: Color(0xFF94A3B8),
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(height: 12),
-                                    Text(
-                                      'KIA - RESPAWNING...',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 2,
-                                      ),
-                                    ),
-                                    SizedBox(height: 6),
-                                    Text(
-                                      'Returning to combat in 3 seconds',
-                                      style: TextStyle(
-                                        color: Color(0xFF94A3B8),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),

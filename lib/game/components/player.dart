@@ -79,6 +79,11 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   double poisonFlashTimer = 0.0;
   bool get isPoisoned => poisonFlashTimer > 0;
 
+  // Combat Attacker Tracking (for "who killed who")
+  String? lastAttackerId;
+  String? lastAttackerName;
+  String lastAttackerWeapon = 'bullet';
+
   // Visual Assets & Overlay
   Sprite? faceSprite;
   late final CharacterDefinition characterDef;
@@ -249,9 +254,15 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     }
   }
 
-  /// Take damage from incoming bullets
-  void takeDamage(double amount, {String? attackerId}) {
+  /// Take damage from incoming bullets or environmental hazards
+  void takeDamage(double amount, {String? attackerId, String? attackerName, String weapon = 'bullet'}) {
     if (isDead) return;
+
+    if (attackerId != null) {
+      lastAttackerId = attackerId;
+      lastAttackerName = attackerName;
+      lastAttackerWeapon = weapon;
+    }
 
     health = max(0.0, health - amount);
     if (health <= 0.0) {
@@ -278,6 +289,9 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     isDead = false;
     fartAnimationTimer = 0.0;
     poisonFlashTimer = 0.0;
+    lastAttackerId = null;
+    lastAttackerName = null;
+    lastAttackerWeapon = 'bullet';
     health = maxHealth;
     velocity.setZero();
     currentAnimation = PlayerAnimState.idle;
