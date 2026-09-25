@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'multiplayer_client.dart';
 import 'player_state.dart';
+import '../characters/character_registry.dart';
 
 /// Mock multiplayer client simulating local bots and network state for up to 10 players.
 class MockMultiplayerClient implements MultiplayerClient {
@@ -80,18 +81,7 @@ class MockMultiplayerClient implements MultiplayerClient {
       final charId = availableCharIds[i % availableCharIds.length];
       final spawn = spawnPositions[i % spawnPositions.length];
 
-      final botNames = [
-        'Ghost',
-        'Viper',
-        'Havoc',
-        'Titan',
-        'Shadow',
-        'Razor',
-        'Blaze',
-        'Frost',
-        'Apex',
-      ];
-      final name = botNames[i % botNames.length];
+      final name = CharacterRegistry.getById(charId).name;
 
       _players[botId] = PlayerState(
         playerId: botId,
