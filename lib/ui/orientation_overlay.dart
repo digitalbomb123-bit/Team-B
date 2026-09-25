@@ -78,7 +78,7 @@ class OrientationOverlay extends StatelessWidget {
                   const SizedBox(height: 10),
 
                   const Text(
-                    'Mini Militia Arena is designed for Mobile Landscape gameplay.',
+                    'Team B Arena is designed for Mobile Landscape gameplay.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF94A3B8),

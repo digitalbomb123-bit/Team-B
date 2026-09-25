@@ -133,12 +133,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          'MINI MILITIA 2D',
+                                          'TEAM B',
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontSize: isCompactHeight ? 16 : 20,
+                                            fontSize: isCompactHeight ? 17 : 22,
                                             fontWeight: FontWeight.w900,
-                                            letterSpacing: 1.5,
+                                            letterSpacing: 2.0,
                                           ),
                                         ),
                                       ],
@@ -216,11 +216,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                   SizedBox(height: isCompactHeight ? 4 : 8),
 
                                   Text(
-                                    '${selectedDef.name} (${selectedDef.callsign})',
+                                    selectedDef.name,
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: isCompactHeight ? 13 : 16,
-                                      fontWeight: FontWeight.bold,
+                                      fontSize: isCompactHeight ? 14 : 18,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                   if (!isVeryCompact)
@@ -236,18 +237,18 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
                                   SizedBox(height: isCompactHeight ? 6 : 10),
 
-                                  // Selected Avatar Name Badge (Automatic)
+                                  // Status Badge
                                   Container(
                                     padding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: isCompactHeight ? 6 : 8,
+                                      horizontal: 10,
+                                      vertical: isCompactHeight ? 4 : 6,
                                     ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF0F172A),
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
-                                        width: 1.2,
+                                        color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                                        width: 1.0,
                                       ),
                                     ),
                                     child: Row(
@@ -257,19 +258,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                         const Icon(
                                           Icons.person_pin_rounded,
                                           color: Color(0xFF38BDF8),
-                                          size: 15,
+                                          size: 14,
                                         ),
-                                        const SizedBox(width: 6),
-                                        Flexible(
-                                          child: Text(
-                                            selectedDef.name,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: isCompactHeight ? 12 : 14,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.5,
-                                            ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          'OPERATOR READY',
+                                          style: TextStyle(
+                                            color: const Color(0xFF38BDF8),
+                                            fontSize: isCompactHeight ? 9 : 10.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.8,
                                           ),
                                         ),
                                       ],
@@ -915,18 +913,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                fontSize: isCompact ? 9 : 10,
-                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-              ),
-            ),
-            Text(
-              char.callsign,
-              style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF38BDF8)
-                    : const Color(0xFF64748B),
-                fontSize: isCompact ? 7.5 : 8,
-                fontWeight: FontWeight.bold,
+                fontSize: isCompact ? 9.5 : 10.5,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
               ),
             ),
           ],

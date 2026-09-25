@@ -14,16 +14,16 @@ void main() async {
   // Enable immersive edge-to-edge mode for mobile displays
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  runApp(const MiniMilitiaApp());
+  runApp(const TeamBApp());
 }
 
-class MiniMilitiaApp extends StatelessWidget {
-  const MiniMilitiaApp({super.key});
+class TeamBApp extends StatelessWidget {
+  const TeamBApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Mini Militia 2D Arena',
+      title: 'Team B',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -39,3 +39,6 @@ class MiniMilitiaApp extends StatelessWidget {
     );
   }
 }
+
+/// Backward compatibility alias for tests
+typedef MiniMilitiaApp = TeamBApp;

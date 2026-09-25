@@ -666,7 +666,6 @@ class _RoomWaitingScreenState extends State<RoomWaitingScreen>
                   // Slot 1: You (Local Player)
                   return _buildPlayerSlotCard(
                     name: widget.playerName,
-                    callsign: localDef.callsign,
                     faceAsset: localDef.faceAsset,
                     isLocalPlayer: true,
                     isOccupied: true,
@@ -681,7 +680,6 @@ class _RoomWaitingScreenState extends State<RoomWaitingScreen>
                   final charDef = CharacterRegistry.getById(p.characterId);
                   return _buildPlayerSlotCard(
                     name: p.name,
-                    callsign: charDef.callsign,
                     faceAsset: charDef.faceAsset,
                     isLocalPlayer: false,
                     isOccupied: true,
@@ -702,7 +700,6 @@ class _RoomWaitingScreenState extends State<RoomWaitingScreen>
 
   Widget _buildPlayerSlotCard({
     required String name,
-    required String callsign,
     required String faceAsset,
     required bool isLocalPlayer,
     required bool isOccupied,

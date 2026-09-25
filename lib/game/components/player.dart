@@ -355,8 +355,13 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     // Translate local origin to the soldier's feet (Anchor.bottomCenter)
     canvas.translate(size.x / 2, size.y);
 
-    // Render name tag only (health and fuel are shown in the top-left HUD)
+    // Render name tag
     _renderNameTag(canvas);
+
+    // Render overhead health bar for enemies
+    if (!isLocal && !isDead) {
+      _renderEnemyHealthBar(canvas);
+    }
 
     // Apply facing flip
     canvas.scale(facingDirection, 1.0);
@@ -677,5 +682,51 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       canvas,
       Offset(-textPainter.width / 2, topOffset),
     );
+  }
+
+  /// Render overhead health bar for enemy soldiers (without numbers, pure tactical bar)
+  void _renderEnemyHealthBar(Canvas canvas) {
+    if (isLocal || isDead) return;
+
+    const double barWidth = 32.0;
+    const double barHeight = 4.0;
+    const double topOffset = -53.0; // Positioned right below the name tag (-66.0)
+
+    // 1. Dark container background with border
+    final bgPaint = Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.9);
+    final borderPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    final bgRect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(-barWidth / 2, topOffset, barWidth, barHeight),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(bgRect, bgPaint);
+    canvas.drawRRect(bgRect, borderPaint);
+
+    // 2. Health fill based on ratio
+    final healthRatio = (health / maxHealth).clamp(0.0, 1.0);
+    if (healthRatio > 0.0) {
+      final fillWidth = (barWidth - 1.6) * healthRatio;
+      final Color fillColor;
+      if (isPoisoned) {
+        fillColor = const Color(0xFFA3E635); // Toxic Lime flash when poisoned
+      } else if (healthRatio > 0.5) {
+        fillColor = const Color(0xFF22C55E); // Healthy Green
+      } else if (healthRatio > 0.25) {
+        fillColor = const Color(0xFFFBBF24); // Warning Amber
+      } else {
+        fillColor = const Color(0xFFEF4444); // Critical Red
+      }
+
+      final fillPaint = Paint()..color = fillColor;
+      final fillRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(-barWidth / 2 + 0.8, topOffset + 0.8, fillWidth, barHeight - 1.6),
+        const Radius.circular(1.2),
+      );
+      canvas.drawRRect(fillRect, fillPaint);
+    }
   }
 }

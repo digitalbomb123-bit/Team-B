@@ -13,7 +13,7 @@ void main() {
     await tester.pumpWidget(const MiniMilitiaApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('MINI MILITIA 2D'), findsOneWidget);
+    expect(find.text('TEAM B'), findsOneWidget);
     expect(find.text('ENTER ARENA'), findsOneWidget);
   });
 }

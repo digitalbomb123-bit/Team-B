@@ -5,7 +5,7 @@ import 'package:team_b_shooter/controls/input_controller.dart';
 import 'package:team_b_shooter/game/components/player.dart';
 import 'package:team_b_shooter/game/mini_militia_game.dart';
 import 'package:team_b_shooter/multiplayer/mock_multiplayer_client.dart';
-import 'package:team_b_shooter/multiplayer/player_state.dart';
+import 'package:team_b_shooter/ui/hud.dart';
 import 'package:team_b_shooter/ui/kill_feed_overlay.dart';
 
 void main() {
@@ -171,6 +171,45 @@ void main() {
       expect(recordedWeapon, equals('bullet'));
       expect(recordedIsLocalVictim, isTrue);
       expect(game.deaths, equals(1));
+    });
+
+    testWidgets('GameHud renders playerName once without duplicate callsign badge', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GameHud(
+              currentHealth: 100,
+              maxHealth: 100,
+              kills: 2,
+              deaths: 1,
+              characterId: 0,
+              playerName: 'Nandhu',
+              onPausePressed: () {},
+            ),
+          ),
+        ),
+      );
+
+      // Name should be displayed once
+      expect(find.text('Nandhu'), findsOneWidget);
+      // Callsign 'NANDHU' shouldn't be duplicated as a badge
+      expect(find.text('NANDHU'), findsNothing);
+    });
+
+    test('Enemy player has isLocal false and maintains health for overhead healthbar', () {
+      final enemy = PlayerComponent(
+        playerId: 'enemy_1',
+        characterId: 1,
+        name: 'Albin',
+        position: Vector2(100, 100),
+        isLocal: false,
+      );
+
+      expect(enemy.isLocal, isFalse);
+      expect(enemy.health, equals(100.0));
+      enemy.takeDamage(40.0);
+      expect(enemy.health, equals(60.0));
+      expect(enemy.isDead, isFalse);
     });
   });
 }
