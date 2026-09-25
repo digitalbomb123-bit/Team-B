@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../../characters/character_definition.dart';
 import '../../characters/character_registry.dart';
+import '../mini_militia_game.dart';
+import 'floating_text.dart';
+import 'toxic_gas_cloud.dart';
 import 'weapon.dart';
 
 enum PlayerAnimState {
@@ -59,6 +62,13 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   bool isFlying = false;
   double _jetpackCooldownTimer = 0.0;
   static const double jetpackRechargeDelay = 0.5; // Refill delay in seconds
+
+  // Fart Bomb & Toxic Mechanics
+  int fartBombCount = 0;
+  double fartAnimationTimer = 0.0;
+  bool get isFarting => fartAnimationTimer > 0;
+  double poisonFlashTimer = 0.0;
+  bool get isPoisoned => poisonFlashTimer > 0;
 
   // Visual Assets & Overlay
   Sprite? faceSprite;
@@ -122,6 +132,12 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     weapon.update(dt);
     if (muzzleFlashTimer > 0) {
       muzzleFlashTimer -= dt;
+    }
+    if (fartAnimationTimer > 0) {
+      fartAnimationTimer -= dt;
+    }
+    if (poisonFlashTimer > 0) {
+      poisonFlashTimer -= dt;
     }
 
     if (isDead) {
@@ -233,6 +249,8 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   void die() {
     if (isDead) return;
     isDead = true;
+    fartAnimationTimer = 0.0;
+    poisonFlashTimer = 0.0;
     health = 0.0;
     velocity.setZero();
     currentAnimation = PlayerAnimState.death;
@@ -243,6 +261,8 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   /// Respawn player with full health
   void respawn({Vector2? newPosition}) {
     isDead = false;
+    fartAnimationTimer = 0.0;
+    poisonFlashTimer = 0.0;
     health = maxHealth;
     velocity.setZero();
     currentAnimation = PlayerAnimState.idle;
@@ -250,6 +270,42 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       position.setFrom(newPosition);
     }
     onRespawn?.call(this);
+  }
+
+  /// Blasts a fart bomb releasing a lingering toxic green gas cloud and comically launching the player
+  bool blastFartBomb(MiniMilitiaGame game) {
+    if (fartBombCount <= 0 || isDead) return false;
+    fartBombCount--;
+    fartAnimationTimer = 0.65;
+
+    // Fart jet propulsion
+    velocity.x += facingDirection * 170.0;
+    velocity.y -= 110.0;
+    isGrounded = false;
+
+    // Spawn toxic gas cloud right behind the player
+    final cloudPos = Vector2(position.x - facingDirection * 18, position.y - 24);
+    game.world.add(
+      ToxicGasCloudComponent(
+        position: cloudPos,
+        shooterId: playerId,
+        maxRadius: 85.0,
+        lifetime: 7.0,
+      ),
+    );
+
+    // Comical floating sound text
+    game.world.add(
+      FloatingCombatTextComponent(
+        position: Vector2(position.x, position.y - 50),
+        text: '💨 PFFFFFFFT!',
+        color: const Color(0xFFBEF264),
+        fontSize: 13,
+      ),
+    );
+
+    game.notifyFartBombCountChanged(fartBombCount);
+    return true;
   }
 
   Vector2 getMuzzleWorldPosition() {
@@ -286,13 +342,63 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       _renderWeapon(canvas);
       canvas.restore();
     } else {
+      if (isFarting) {
+        _renderFartEffect(canvas);
+      }
+      if (poisonFlashTimer > 0) {
+        _renderPoisonAura(canvas);
+      }
+      canvas.save();
+      if (isFarting) {
+        // Lean forward comically while pushing fart
+        canvas.rotate(0.20);
+      }
       // Alive rendering in 3 distinct layers:
       _renderBody(canvas);
       _renderFace(canvas);
       _renderWeapon(canvas);
+      canvas.restore();
     }
 
     canvas.restore();
+  }
+
+  void _renderFartEffect(Canvas canvas) {
+    final progress = 1.0 - (fartAnimationTimer / 0.65).clamp(0.0, 1.0);
+    final puffScale = 0.5 + progress * 1.5;
+
+    final puffPaint1 = Paint()
+      ..color = const Color(0xFF84CC16).withValues(alpha: (1.0 - progress) * 0.85);
+    final puffPaint2 = Paint()
+      ..color = const Color(0xFFEAB308).withValues(alpha: (1.0 - progress) * 0.75);
+    final puffPaint3 = Paint()
+      ..color = const Color(0xFF22C55E).withValues(alpha: (1.0 - progress) * 0.90);
+
+    final streakPaint = Paint()
+      ..color = const Color(0xFFBEF264).withValues(alpha: (1.0 - progress))
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    const bx = -14.0;
+    const by = -22.0;
+
+    canvas.drawLine(const Offset(bx, by), Offset(bx - 20 * puffScale, by - 10), streakPaint);
+    canvas.drawLine(const Offset(bx, by), Offset(bx - 26 * puffScale, by), streakPaint);
+    canvas.drawLine(const Offset(bx, by), Offset(bx - 20 * puffScale, by + 12), streakPaint);
+
+    canvas.drawCircle(Offset(bx - 12 * puffScale, by - 6), 10 * puffScale, puffPaint1);
+    canvas.drawCircle(Offset(bx - 20 * puffScale, by + 4), 14 * puffScale, puffPaint2);
+    canvas.drawCircle(Offset(bx - 28 * puffScale, by - 2), 16 * puffScale, puffPaint3);
+  }
+
+  void _renderPoisonAura(Canvas canvas) {
+    final poisonPaint = Paint()
+      ..color = const Color(0xFF84CC16).withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(0, -28), width: 34, height: 56),
+      poisonPaint,
+    );
   }
 
   /// 1. BODY RENDERING (Shared across all characters)

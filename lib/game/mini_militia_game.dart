@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import '../controls/input_controller.dart';
 import '../multiplayer/multiplayer_client.dart';
 import '../multiplayer/player_state.dart';
 import 'camera/game_camera.dart';
+import 'components/fart_bomb_pickup.dart';
 import 'components/player.dart';
 import 'systems/collision_system.dart';
 import 'systems/combat_system.dart';
@@ -40,6 +42,11 @@ class MiniMilitiaGame extends FlameGame {
   void Function(double health, double maxHealth)? onHealthChanged;
   void Function(double fuel, double maxFuel)? onFuelChanged;
   void Function(int kills, int deaths)? onScoreChanged;
+  void Function(int count)? onFartBombCountChanged;
+
+  void notifyFartBombCountChanged(int count) {
+    onFartBombCountChanged?.call(count);
+  }
 
   MiniMilitiaGame({
     required this.multiplayerClient,
@@ -96,7 +103,42 @@ class MiniMilitiaGame extends FlameGame {
     // 5. Connect multiplayer listeners
     _setupNetworkListeners();
 
+    // 6. Spawn initial random Fart Bomb pickups on arena platforms
+    spawnFartBombPickup();
+    spawnFartBombPickup();
+
     _initialized = true;
+  }
+
+  /// Spawns a Fart Bomb pickup on a random arena platform
+  void spawnFartBombPickup() {
+    final rnd = Random();
+    final validPlatforms = arena.platforms
+        .where((p) => p.size.x >= 120 && p.position.y > 100 && p.position.y < 1000)
+        .toList();
+    if (validPlatforms.isEmpty) return;
+
+    final plat = validPlatforms[rnd.nextInt(validPlatforms.length)];
+    final x = plat.position.x + 40 + rnd.nextDouble() * max(20.0, plat.size.x - 80);
+    final y = plat.position.y - 12;
+
+    final pickup = FartBombPickupComponent(
+      position: Vector2(x, y),
+      onCollected: () {
+        // Schedule next random pickup after 12 seconds
+        Future.delayed(const Duration(seconds: 12), () {
+          if (isMounted) {
+            spawnFartBombPickup();
+          }
+        });
+      },
+    );
+    world.add(pickup);
+  }
+
+  /// Trigger the local player's fart bomb blast
+  bool triggerLocalFartBomb() {
+    return localPlayer.blastFartBomb(this);
   }
 
   void _setupNetworkListeners() {

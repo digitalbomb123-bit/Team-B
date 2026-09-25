@@ -14,7 +14,10 @@ class GameHud extends StatelessWidget {
   final int characterId;
   final String playerName;
   final int totalPlayers;
+  final int remainingSeconds;
+  final int fartBombCount;
   final VoidCallback onPausePressed;
+  final VoidCallback? onScoreboardPressed;
 
   const GameHud({
     super.key,
@@ -27,7 +30,10 @@ class GameHud extends StatelessWidget {
     required this.characterId,
     required this.playerName,
     this.totalPlayers = 10,
+    this.remainingSeconds = 180,
+    this.fartBombCount = 0,
     required this.onPausePressed,
+    this.onScoreboardPressed,
   });
 
   @override
@@ -41,8 +47,14 @@ class GameHud extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 1. TOP-LEFT: Health, Avatar, and Player Info
-            _buildPlayerCard(character),
+            // 1. TOP-LEFT: Health, Avatar, and Player Info + Fart Bomb inventory
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPlayerCard(character),
+                _buildFartBombIndicator(),
+              ],
+            ),
 
             // 2. TOP-CENTER: Kills, Deaths, Score & Match Info
             _buildScoreBadge(),
@@ -51,6 +63,41 @@ class GameHud extends StatelessWidget {
             _buildPauseButton(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFartBombIndicator() {
+    if (fartBombCount <= 0) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF84CC16), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF84CC16).withValues(alpha: 0.4),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('💨', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 4),
+          Text(
+            'x$fartBombCount',
+            style: const TextStyle(
+              color: Color(0xFFBEF264),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -182,65 +229,112 @@ class GameHud extends StatelessWidget {
   }
 
   Widget _buildScoreBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
-          width: 1.5,
+    return InkWell(
+      onTap: onScoreboardPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Kills
+            const Icon(Icons.gps_fixed_rounded, color: Color(0xFFEF4444), size: 16),
+            const SizedBox(width: 4),
+            Text(
+              '$kills',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+            Container(width: 1, height: 16, color: Colors.white24),
+            const SizedBox(width: 12),
+
+            // Deaths
+            const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 16),
+            const SizedBox(width: 4),
+            Text(
+              '$deaths',
+              style: const TextStyle(
+                color: Color(0xFFCBD5E1),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+            Container(width: 1, height: 16, color: Colors.white24),
+            const SizedBox(width: 12),
+
+            // Player Count
+            const Icon(Icons.people_alt_rounded, color: Color(0xFF38BDF8), size: 16),
+            const SizedBox(width: 4),
+            Text(
+              '$totalPlayers / 10',
+              style: const TextStyle(
+                color: Color(0xFF38BDF8),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+            Container(width: 1, height: 16, color: Colors.white24),
+            const SizedBox(width: 12),
+
+            // Match Countdown Timer
+            ..._buildMatchTimer(),
+          ],
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Kills
-          const Icon(Icons.gps_fixed_rounded, color: Color(0xFFEF4444), size: 16),
-          const SizedBox(width: 4),
-          Text(
-            '$kills',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-          Container(width: 1, height: 16, color: Colors.white24),
-          const SizedBox(width: 12),
-
-          // Deaths
-          const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 16),
-          const SizedBox(width: 4),
-          Text(
-            '$deaths',
-            style: const TextStyle(
-              color: Color(0xFFCBD5E1),
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-          Container(width: 1, height: 16, color: Colors.white24),
-          const SizedBox(width: 12),
-
-          // Player Count
-          const Icon(Icons.people_alt_rounded, color: Color(0xFF38BDF8), size: 16),
-          const SizedBox(width: 4),
-          Text(
-            '$totalPlayers / 10',
-            style: const TextStyle(
-              color: Color(0xFF38BDF8),
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
     );
+  }
+
+  List<Widget> _buildMatchTimer() {
+    final m = remainingSeconds ~/ 60;
+    final s = remainingSeconds % 60;
+    final timeStr =
+        '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+
+    final Color timerColor;
+    if (remainingSeconds <= 10) {
+      timerColor = const Color(0xFFEF4444); // Urgent red
+    } else if (remainingSeconds <= 30) {
+      timerColor = const Color(0xFFF59E0B); // Warning amber
+    } else {
+      timerColor = const Color(0xFF38BDF8); // Normal cyan
+    }
+
+    return [
+      Icon(
+        remainingSeconds <= 10
+            ? Icons.timer_outlined
+            : Icons.timer_outlined,
+        color: timerColor,
+        size: 15,
+      ),
+      const SizedBox(width: 4),
+      Text(
+        timeStr,
+        style: TextStyle(
+          color: timerColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    ];
   }
 
   Widget _buildPauseButton() {

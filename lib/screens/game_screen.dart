@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
@@ -12,7 +13,9 @@ import '../multiplayer/multiplayer_client.dart';
 import '../multiplayer/websocket_multiplayer_client.dart';
 import '../ui/hud.dart';
 import '../ui/orientation_overlay.dart';
+import '../ui/scoreboard_dialog.dart';
 import 'lobby_screen.dart';
+import 'room_waiting_screen.dart';
 
 /// Active gameplay screen embedding Flame GameWidget, HUD, and responsive controls.
 class GameScreen extends StatefulWidget {
@@ -22,6 +25,7 @@ class GameScreen extends StatefulWidget {
   final bool isOnlineMultiplayer;
   final String roomId;
   final String serverUrl;
+  final int gameDurationSeconds;
   final MultiplayerClient? customMultiplayerClient;
 
   const GameScreen({
@@ -32,6 +36,7 @@ class GameScreen extends StatefulWidget {
     this.isOnlineMultiplayer = false,
     this.roomId = 'ARENA-1',
     this.serverUrl = 'wss://team-b-6hro.onrender.com',
+    this.gameDurationSeconds = 180,
     this.customMultiplayerClient,
   });
 
@@ -49,6 +54,11 @@ class _GameScreenState extends State<GameScreen> {
   final ValueNotifier<double> _fuelNotifier = ValueNotifier<double>(100.0);
   final ValueNotifier<({int kills, int deaths})> _scoreNotifier =
       ValueNotifier((kills: 0, deaths: 0));
+  final ValueNotifier<int> _fartBombNotifier = ValueNotifier<int>(0);
+  late final ValueNotifier<int> _matchTimerNotifier;
+  late int _remainingMatchSeconds;
+  Timer? _matchTimer;
+  bool _matchFinished = false;
   double _currentZoom = GameCameraConfig.cameraZoom;
 
   // Desktop keyboard key state tracking
@@ -62,6 +72,9 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _inputController = InputController();
+    _remainingMatchSeconds = widget.gameDurationSeconds;
+    _matchTimerNotifier = ValueNotifier<int>(_remainingMatchSeconds);
+    _startMatchTimer();
 
     if (widget.customMultiplayerClient != null) {
       _multiplayerClient = widget.customMultiplayerClient!;
@@ -108,31 +121,181 @@ class _GameScreenState extends State<GameScreen> {
       });
     };
 
+    _game.onFartBombCountChanged = (count) {
+      if (_fartBombNotifier.value != count) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _fartBombNotifier.value = count;
+          }
+        });
+      }
+    };
+
+    _inputController.onFartBombPressed = _triggerFartBomb;
+
     final client = _multiplayerClient;
-    if (client is MockMultiplayerClient) {
-      client.connect(
-        roomId: widget.roomId,
-        playerName: widget.playerName,
-        characterId: widget.characterId,
-        botCount: widget.botCount,
-      );
-    } else {
-      client.connect(
-        roomId: widget.roomId,
-        playerName: widget.playerName,
-        characterId: widget.characterId,
+    if (widget.customMultiplayerClient == null) {
+      if (client is MockMultiplayerClient) {
+        client.connect(
+          roomId: widget.roomId,
+          playerName: widget.playerName,
+          characterId: widget.characterId,
+          botCount: widget.botCount,
+        );
+      } else {
+        client.connect(
+          roomId: widget.roomId,
+          playerName: widget.playerName,
+          characterId: widget.characterId,
+        );
+      }
+    }
+  }
+
+  void _triggerFartBomb() {
+    _game.triggerLocalFartBomb();
+  }
+
+  void _startMatchTimer() {
+    _matchTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_game.paused) return;
+
+      if (_remainingMatchSeconds <= 1) {
+        timer.cancel();
+        _remainingMatchSeconds = 0;
+        _matchTimerNotifier.value = 0;
+        _handleMatchFinished();
+      } else {
+        _remainingMatchSeconds--;
+        _matchTimerNotifier.value = _remainingMatchSeconds;
+      }
+    });
+  }
+
+  List<MatchPlayerScore> _buildMatchScoreboard() {
+    final localId = _multiplayerClient.localPlayerId;
+    final localKills = _scoreNotifier.value.kills;
+    final localDeaths = _scoreNotifier.value.deaths;
+
+    final Map<String, MatchPlayerScore> scoreMap = {};
+
+    // 1. Populate all players tracked by multiplayer client
+    for (final p in _multiplayerClient.currentPlayers) {
+      final isLocal = (p.playerId == localId);
+      scoreMap[p.playerId] = MatchPlayerScore(
+        playerId: p.playerId,
+        name: isLocal ? widget.playerName : p.name,
+        characterId: isLocal ? widget.characterId : p.characterId,
+        kills: isLocal ? localKills : p.kills,
+        deaths: isLocal ? localDeaths : p.deaths,
+        isLocal: isLocal,
       );
     }
+
+    // 2. Ensure local player is recorded even if not yet in currentPlayers
+    if (!scoreMap.containsKey(localId)) {
+      scoreMap[localId] = MatchPlayerScore(
+        playerId: localId,
+        name: widget.playerName,
+        characterId: widget.characterId,
+        kills: localKills,
+        deaths: localDeaths,
+        isLocal: true,
+      );
+    }
+
+    return scoreMap.values.toList();
+  }
+
+  void _showLiveScoreboard() {
+    final wasPaused = _game.paused;
+    _game.paused = true;
+
+    final scores = _buildMatchScoreboard();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return ScoreboardDialog(
+          scores: scores,
+          isMatchOver: false,
+          matchDurationSeconds: widget.gameDurationSeconds,
+          onResume: () {
+            Navigator.of(context).pop();
+            if (!wasPaused) {
+              _game.paused = false;
+              _focusNode.requestFocus();
+            }
+          },
+        );
+      },
+    ).then((_) {
+      if (!wasPaused && !_matchFinished) {
+        _game.paused = false;
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
+  void _handleMatchFinished() {
+    if (_matchFinished) return;
+    _matchFinished = true;
+    _game.paused = true;
+    _inputController.reset();
+
+    final scores = _buildMatchScoreboard();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return ScoreboardDialog(
+          scores: scores,
+          isMatchOver: true,
+          matchDurationSeconds: widget.gameDurationSeconds,
+          onMainMenu: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const LobbyScreen()),
+            );
+          },
+          onPlayAgain: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => RoomWaitingScreen(
+                  characterId: widget.characterId,
+                  playerName: widget.playerName,
+                  botCount: widget.botCount,
+                  isOnlineMultiplayer: widget.isOnlineMultiplayer,
+                  roomId: widget.roomId,
+                  serverUrl: widget.serverUrl,
+                  gameDurationSeconds: widget.gameDurationSeconds,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   void dispose() {
+    _matchTimer?.cancel();
+    _matchTimerNotifier.dispose();
     _multiplayerClient.disconnect();
     _inputController.dispose();
     _focusNode.dispose();
     _healthNotifier.dispose();
     _fuelNotifier.dispose();
     _scoreNotifier.dispose();
+    _fartBombNotifier.dispose();
     super.dispose();
   }
 
@@ -142,6 +305,10 @@ class _GameScreenState extends State<GameScreen> {
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyDownEvent) {
       _pressedKeys.add(event.logicalKey);
+      if (event.logicalKey == LogicalKeyboardKey.keyF ||
+          event.logicalKey == LogicalKeyboardKey.keyB) {
+        _triggerFartBomb();
+      }
     } else if (event is KeyUpEvent) {
       _pressedKeys.remove(event.logicalKey);
     }
@@ -247,7 +414,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '• Mobile: Left Joystick (Move), Right Drag (Aim), JUMP & FIRE buttons\n• Desktop: A/D (Move), W/Space (Jump), Mouse (Aim), Left Click (Fire)',
+                    '• Mobile: Left Joystick (Move/Fly), Right Drag (Aim), JUMP, FIRE & FART BOMB\n• Desktop: A/D (Move), W/Space (Jump), F/B (Fart Bomb), Mouse (Aim), Left Click (Fire)',
                     style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                   ),
                 ],
@@ -261,6 +428,18 @@ class _GameScreenState extends State<GameScreen> {
                     );
                   },
                   child: const Text('EXIT TO LOBBY', style: TextStyle(color: Color(0xFFEF4444))),
+                ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF38BDF8),
+                    side: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _showLiveScoreboard();
+                  },
+                  icon: const Icon(Icons.leaderboard_rounded, size: 16),
+                  label: const Text('SCOREBOARD'),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -306,10 +485,12 @@ class _GameScreenState extends State<GameScreen> {
                         child: GameWidget(game: _game),
                       ),
 
-                      // 2. Mobile Touch Controls (Joystick, Aim, Jump, Fire)
+                      // 2. Mobile Touch Controls (Joystick, Aim, Jump, Fire, Fart Bomb)
                       Positioned.fill(
                         child: MobileControlsOverlay(
                           inputController: _inputController,
+                          fartBombCountListenable: _fartBombNotifier,
+                          onFartBombPressed: _triggerFartBomb,
                         ),
                       ),
 
@@ -327,17 +508,30 @@ class _GameScreenState extends State<GameScreen> {
                                 return ValueListenableBuilder<({int kills, int deaths})>(
                                   valueListenable: _scoreNotifier,
                                   builder: (context, score, _) {
-                                    return GameHud(
-                                      currentHealth: health,
-                                      maxHealth: 100.0,
-                                      currentFuel: fuel,
-                                      maxFuel: 100.0,
-                                      kills: score.kills,
-                                      deaths: score.deaths,
-                                      characterId: widget.characterId,
-                                      playerName: widget.playerName,
-                                      totalPlayers: widget.botCount + 1,
-                                      onPausePressed: _showPauseDialog,
+                                    return ValueListenableBuilder<int>(
+                                      valueListenable: _matchTimerNotifier,
+                                      builder: (context, remainingSec, _) {
+                                        return ValueListenableBuilder<int>(
+                                          valueListenable: _fartBombNotifier,
+                                          builder: (context, fartBombCount, _) {
+                                            return GameHud(
+                                              currentHealth: health,
+                                              maxHealth: 100.0,
+                                              currentFuel: fuel,
+                                              maxFuel: 100.0,
+                                              kills: score.kills,
+                                              deaths: score.deaths,
+                                              characterId: widget.characterId,
+                                              playerName: widget.playerName,
+                                              totalPlayers: widget.botCount + 1,
+                                              remainingSeconds: remainingSec,
+                                              fartBombCount: fartBombCount,
+                                              onPausePressed: _showPauseDialog,
+                                              onScoreboardPressed: _showLiveScoreboard,
+                                            );
+                                          },
+                                        );
+                                      },
                                     );
                                   },
                                 );

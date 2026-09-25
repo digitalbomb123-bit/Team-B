@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../characters/character_definition.dart';
 import '../characters/character_registry.dart';
 import '../ui/orientation_overlay.dart';
-import 'game_screen.dart';
+import 'room_waiting_screen.dart';
 
 /// Pre-game Lobby & Character Selection screen.
 /// Displays all 10 hardcoded character slots and lets player pick their soldier face.
@@ -28,6 +28,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   bool _isOnlineMultiplayer = false;
   int _botCount = 4; // Default 4 bots (total 5 players)
+  int _gameDurationMinutes = 3; // Default 3 minutes match duration (180s)
 
   @override
   void dispose() {
@@ -53,13 +54,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => GameScreen(
+        builder: (_) => RoomWaitingScreen(
           characterId: _selectedCharacterId,
           playerName: name,
           botCount: _botCount,
           isOnlineMultiplayer: _isOnlineMultiplayer,
           roomId: room,
           serverUrl: server,
+          gameDurationSeconds: _gameDurationMinutes * 60,
         ),
       ),
     );
@@ -539,11 +541,188 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                       ),
                                     ),
                                   ],
-                                ],
-                              ),
+
+                                SizedBox(height: isCompactHeight ? 6 : 8),
+
+                                // ==========================================
+                                // GAME TIME / COUNTDOWN SETTER
+                                // ==========================================
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isCompactHeight ? 8 : 10,
+                                    vertical: isCompactHeight ? 5 : 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFF59E0B)
+                                          .withValues(alpha: 0.35),
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.timer_outlined,
+                                              size: 13,
+                                              color: Color(0xFFF59E0B),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            const Text(
+                                              'GAME TIME:',
+                                              style: TextStyle(
+                                                color: Color(0xFFCBD5E1),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              '⏱ ${_gameDurationMinutes.toString().padLeft(2, '0')}:00 ($_gameDurationMinutes min)',
+                                              style: const TextStyle(
+                                                color: Color(0xFFF59E0B),
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(height: isCompactHeight ? 4 : 6),
+                                      // Quick Presets Row: 1m, 2m, 3m, 5m, 10m + Steppers
+                                      Row(
+                                        children: [
+                                          for (final min in [1, 2, 3, 5, 10])
+                                            Expanded(
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 1.5),
+                                                child: InkWell(
+                                                  onTap: () => setState(() =>
+                                                      _gameDurationMinutes =
+                                                          min),
+                                                  borderRadius:
+                                                      BorderRadius.circular(5),
+                                                  child: Container(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                      vertical:
+                                                          isCompactHeight
+                                                              ? 3
+                                                              : 4,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: _gameDurationMinutes ==
+                                                              min
+                                                          ? const Color(
+                                                              0xFFF59E0B)
+                                                          : const Color(
+                                                              0xFF1E293B),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              5),
+                                                      border: Border.all(
+                                                        color: _gameDurationMinutes ==
+                                                                min
+                                                            ? const Color(
+                                                                0xFFF59E0B)
+                                                            : Colors.white12,
+                                                      ),
+                                                    ),
+                                                    child: Center(
+                                                      child: Text(
+                                                        '${min}m',
+                                                        style: TextStyle(
+                                                          color: _gameDurationMinutes ==
+                                                                  min
+                                                              ? const Color(
+                                                                  0xFF0F172A)
+                                                              : Colors.white70,
+                                                          fontSize: 9.5,
+                                                          fontWeight:
+                                                              FontWeight.w900,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          // Stepper [-] and [+]
+                                          const SizedBox(width: 4),
+                                          InkWell(
+                                            onTap: _gameDurationMinutes > 1
+                                                ? () => setState(() =>
+                                                    _gameDurationMinutes--)
+                                                : null,
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1E293B),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border: Border.all(
+                                                    color: Colors.white24),
+                                              ),
+                                              child: const Icon(
+                                                Icons.remove,
+                                                size: 11,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 2),
+                                          InkWell(
+                                            onTap: _gameDurationMinutes < 15
+                                                ? () => setState(() =>
+                                                    _gameDurationMinutes++)
+                                                : null,
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1E293B),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border: Border.all(
+                                                    color: Colors.white24),
+                                              ),
+                                              child: const Icon(
+                                                Icons.add,
+                                                size: 11,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                      ),
 
                         SizedBox(height: isCompactHeight ? 6 : 8),
 

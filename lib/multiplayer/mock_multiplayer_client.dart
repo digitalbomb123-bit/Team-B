@@ -166,18 +166,47 @@ class MockMultiplayerClient implements MultiplayerClient {
         y = min(800.0, y + 140 * dt);
       }
 
-      // Aim towards local player if alive
+      // Aim towards nearest alive opponent (local player or another bot)
       double aim = 0.0;
       bool shooting = false;
+      PlayerState? targetOpponent;
+      double nearestDist = 650.0;
+
+      // 1. Check local player
       if (localP != null && !localP.isDead) {
         final dx = localP.x - bot.x;
         final dy = localP.y - bot.y;
         final dist = sqrt(dx * dx + dy * dy);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          targetOpponent = localP;
+        }
+      }
+
+      // 2. Also check other bots for FFA combat
+      for (final other in _players.values) {
+        if (other.playerId == botId ||
+            other.playerId == _localPlayerId ||
+            other.isDead) {
+          continue;
+        }
+        final dx = other.x - bot.x;
+        final dy = other.y - bot.y;
+        final dist = sqrt(dx * dx + dy * dy);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          targetOpponent = other;
+        }
+      }
+
+      if (targetOpponent != null) {
+        final dx = targetOpponent.x - bot.x;
+        final dy = targetOpponent.y - bot.y;
         aim = atan2(dy, dx);
 
-        // Shoot at local player when in range
+        // Shoot at opponent when in range
         data.shootCooldown -= dt;
-        if (dist < 600 && data.shootCooldown <= 0) {
+        if (data.shootCooldown <= 0) {
           data.shootCooldown = 1.2 + _rnd.nextDouble() * 1.5;
           shooting = true;
 
