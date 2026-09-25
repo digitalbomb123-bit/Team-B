@@ -7,6 +7,7 @@ import '../../characters/character_definition.dart';
 import '../../characters/character_registry.dart';
 import '../mini_militia_game.dart';
 import 'floating_text.dart';
+import 'poop_trap.dart';
 import 'toxic_gas_cloud.dart';
 import 'weapon.dart';
 import '../../audio/audio_manager.dart';
@@ -80,6 +81,21 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   bool get isFarting => fartAnimationTimer > 0;
   double poisonFlashTimer = 0.0;
   bool get isPoisoned => poisonFlashTimer > 0;
+
+  // Jos Avatar Exclusive: Poop Power & Stuck Trap Mechanics
+  double stuckTimer = 0.0;
+  bool get isStuck => stuckTimer > 0;
+  bool get isJos => characterId == 5 || name.toLowerCase() == 'jos';
+  double poopCooldownTimer = 0.0;
+  static const double maxPoopCooldown = 5.0;
+  bool get canPoop => isJos && !isDead && poopCooldownTimer <= 0;
+
+  void applyPoopStuck(double duration, {String? trapperName}) {
+    if (isDead) return;
+    stuckTimer = duration;
+    velocity.x = 0;
+    isFlying = false;
+  }
 
   // Combat Attacker Tracking (for "who killed who")
   String? lastAttackerId;
@@ -170,8 +186,20 @@ class PlayerComponent extends PositionComponent with HasGameReference {
 
     _animTime += dt;
 
+    // Jos avatar poop power cooldown timer
+    if (poopCooldownTimer > 0) {
+      poopCooldownTimer = max(0.0, poopCooldownTimer - dt);
+    }
+
+    // Stuck in poop immobilization
+    if (stuckTimer > 0) {
+      stuckTimer = max(0.0, stuckTimer - dt);
+      velocity.x = 0;
+      isFlying = false;
+    }
+
     // --- JETPACK FLIGHT & AUTOMATIC FUEL REFILL ---
-    if (isFlying && (jetpackFuel > 0 || superFuelTimer > 0)) {
+    if (isFlying && !isStuck && (jetpackFuel > 0 || superFuelTimer > 0)) {
       if (superFuelTimer > 0) {
         superFuelTimer = max(0.0, superFuelTimer - dt);
         jetpackFuel = maxJetpackFuel; // Maintain full standard fuel during super boost
@@ -195,7 +223,9 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     }
 
     // Determine animation state based on physics
-    if (!isGrounded) {
+    if (isStuck) {
+      currentAnimation = PlayerAnimState.idle;
+    } else if (!isGrounded) {
       currentAnimation = velocity.y < 0 ? PlayerAnimState.jump : PlayerAnimState.fall;
     } else if (isShooting) {
       currentAnimation = PlayerAnimState.shoot;
@@ -208,7 +238,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
 
   /// Activate or deactivate jetpack flight
   void setFlying(bool flying) {
-    if (isDead) {
+    if (isDead || isStuck) {
       isFlying = false;
       return;
     }
@@ -222,7 +252,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
 
   /// Apply horizontal input movement
   void move(double directionX) {
-    if (isDead) return;
+    if (isDead || isStuck) return;
 
     final control = isGrounded ? 1.0 : airControl;
     velocity.x = directionX * moveSpeed * control;
@@ -237,7 +267,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
 
   /// Jump if grounded, or fire jetpack if already airborne
   void jump() {
-    if (isDead) return;
+    if (isDead || isStuck) return;
     if (isGrounded) {
       velocity.y = jumpForce;
       isGrounded = false;
@@ -279,6 +309,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     fartAnimationTimer = 0.0;
     poisonFlashTimer = 0.0;
     superFuelTimer = 0.0;
+    stuckTimer = 0.0;
     health = 0.0;
     velocity.setZero();
     currentAnimation = PlayerAnimState.death;
@@ -353,6 +384,35 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     return true;
   }
 
+  /// Drops a tactical poop trap onto the battlefield (Exclusive to Jos avatar)
+  bool dropPoop(MiniMilitiaGame game) {
+    if (!canPoop) return false;
+    poopCooldownTimer = maxPoopCooldown;
+
+    // Drop poop right behind/at feet of Jos
+    final poopPos = Vector2(position.x - facingDirection * 12, position.y);
+    game.world.add(
+      PoopTrapComponent(
+        position: poopPos,
+        ownerId: playerId,
+        ownerName: name,
+        stuckDuration: 3.5,
+      ),
+    );
+
+    // Comic floating text
+    game.world.add(
+      FloatingCombatTextComponent(
+        position: Vector2(position.x, position.y - 50),
+        text: '💩 PLOP!',
+        color: const Color(0xFFD97706),
+        fontSize: 14,
+      ),
+    );
+
+    return true;
+  }
+
   Vector2 getMuzzleWorldPosition() {
     final armPivot = Vector2(position.x, position.y - 32);
     final offset = Vector2(cos(aimAngle), sin(aimAngle)) * weapon.barrelLength;
@@ -397,6 +457,9 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       }
       if (poisonFlashTimer > 0) {
         _renderPoisonAura(canvas);
+      }
+      if (isStuck) {
+        _renderStuckInPoopEffect(canvas);
       }
       canvas.save();
       if (isFarting) {
@@ -449,6 +512,50 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       Rect.fromCenter(center: const Offset(0, -28), width: 34, height: 56),
       poisonPaint,
     );
+  }
+
+  void _renderStuckInPoopEffect(Canvas canvas) {
+    // 1. Brown sticky puddle around feet
+    final puddlePaint = Paint()
+      ..color = const Color(0xFF78350F).withValues(alpha: 0.90)
+      ..style = PaintingStyle.fill;
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(0, 0), width: 38, height: 14),
+      puddlePaint,
+    );
+    final innerPuddlePaint = Paint()
+      ..color = const Color(0xFF92400E)
+      ..style = PaintingStyle.fill;
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(0, -1), width: 28, height: 10),
+      innerPuddlePaint,
+    );
+
+    // 2. Sticky goo strands pulling up from boots
+    final gooPaint = Paint()
+      ..color = const Color(0xFF78350F)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(const Offset(-8, 0), const Offset(-5, -12), gooPaint);
+    canvas.drawLine(const Offset(8, 0), const Offset(6, -12), gooPaint);
+    canvas.drawLine(const Offset(0, 0), const Offset(1, -16), gooPaint);
+
+    // 3. Poop emoji / comic warning above head
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: '💩 STUCK!',
+        style: TextStyle(
+          color: Color(0xFFFBBF24),
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          shadows: [
+            Shadow(color: Colors.black, blurRadius: 4),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    textPainter.paint(canvas, Offset(-textPainter.width / 2, -68));
   }
 
   /// 1. BODY RENDERING (Shared across all characters)

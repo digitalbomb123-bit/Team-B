@@ -10,12 +10,18 @@ class MobileControlsOverlay extends StatefulWidget {
   final InputController inputController;
   final ValueNotifier<int>? fartBombCountListenable;
   final VoidCallback? onFartBombPressed;
+  final int selectedCharacterId;
+  final ValueNotifier<double>? poopCooldownListenable;
+  final VoidCallback? onPoopPressed;
 
   const MobileControlsOverlay({
     super.key,
     required this.inputController,
     this.fartBombCountListenable,
     this.onFartBombPressed,
+    this.selectedCharacterId = 1,
+    this.poopCooldownListenable,
+    this.onPoopPressed,
   });
 
   @override
@@ -76,28 +82,48 @@ class _MobileControlsOverlayState extends State<MobileControlsOverlay> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Dedicated FART BOMB Button (Enabled when collected from map)
+                // Special Power Button: Exclusive POOP power for Jos (#5), or FART BOMB for others
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8, right: 18),
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: widget.fartBombCountListenable ?? ValueNotifier<int>(0),
-                    builder: (context, bombCount, _) {
-                      return _FartBombButton(
-                        size: 64,
-                        bombCount: bombCount,
-                        onPressed: bombCount > 0
-                            ? () {
-                                widget.inputController.usingTouchControls = true;
-                                if (widget.onFartBombPressed != null) {
-                                  widget.onFartBombPressed!();
-                                } else {
-                                  widget.inputController.triggerFartBomb();
-                                }
-                              }
-                            : null,
-                      );
-                    },
-                  ),
+                  child: widget.selectedCharacterId == 5
+                      ? ValueListenableBuilder<double>(
+                          valueListenable: widget.poopCooldownListenable ?? ValueNotifier<double>(0.0),
+                          builder: (context, cooldown, _) {
+                            return _PoopPowerButton(
+                              size: 64,
+                              cooldown: cooldown,
+                              onPressed: cooldown <= 0
+                                  ? () {
+                                      widget.inputController.usingTouchControls = true;
+                                      if (widget.onPoopPressed != null) {
+                                        widget.onPoopPressed!();
+                                      } else {
+                                        widget.inputController.triggerPoop();
+                                      }
+                                    }
+                                  : null,
+                            );
+                          },
+                        )
+                      : ValueListenableBuilder<int>(
+                          valueListenable: widget.fartBombCountListenable ?? ValueNotifier<int>(0),
+                          builder: (context, bombCount, _) {
+                            return _FartBombButton(
+                              size: 64,
+                              bombCount: bombCount,
+                              onPressed: bombCount > 0
+                                  ? () {
+                                      widget.inputController.usingTouchControls = true;
+                                      if (widget.onFartBombPressed != null) {
+                                        widget.onFartBombPressed!();
+                                      } else {
+                                        widget.inputController.triggerFartBomb();
+                                      }
+                                    }
+                                  : null,
+                            );
+                          },
+                        ),
                 ),
 
                 // Right Joystick (Aim & Fire)
@@ -405,6 +431,191 @@ class _FartBombButtonState extends State<_FartBombButton> with SingleTickerProvi
                         style: TextStyle(
                           color: isEnabled ? const Color(0xFFBEF264) : Colors.white38,
                           fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Tactical Poop Power Button exclusive to Jos (#5)
+class _PoopPowerButton extends StatefulWidget {
+  final double size;
+  final double cooldown;
+  final VoidCallback? onPressed;
+
+  const _PoopPowerButton({
+    required this.size,
+    required this.cooldown,
+    required this.onPressed,
+  });
+
+  @override
+  State<_PoopPowerButton> createState() => _PoopPowerButtonState();
+}
+
+class _PoopPowerButtonState extends State<_PoopPowerButton> with SingleTickerProviderStateMixin {
+  bool _isPressed = false;
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    if (widget.cooldown <= 0 && widget.onPressed != null) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PoopPowerButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasReady = oldWidget.cooldown <= 0 && oldWidget.onPressed != null;
+    final isReady = widget.cooldown <= 0 && widget.onPressed != null;
+    if (isReady && !wasReady) {
+      _pulseController.repeat(reverse: true);
+    } else if (!isReady && wasReady) {
+      _pulseController.stop();
+      _pulseController.value = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isReady = widget.cooldown <= 0 && widget.onPressed != null;
+
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final pulseValue = isReady ? _pulseController.value : 0.0;
+
+        return GestureDetector(
+          onTapDown: isReady ? (_) => setState(() => _isPressed = true) : null,
+          onTapUp: isReady
+              ? (_) {
+                  setState(() => _isPressed = false);
+                  widget.onPressed?.call();
+                }
+              : null,
+          onTapCancel: isReady ? () => setState(() => _isPressed = false) : null,
+          child: AnimatedScale(
+            scale: _isPressed ? 0.90 : 1.0,
+            duration: const Duration(milliseconds: 70),
+            child: Container(
+              width: widget.size,
+              height: widget.size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: isReady
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFFB45309).withValues(alpha: 0.75),
+                          const Color(0xFF78350F).withValues(alpha: 0.75),
+                        ],
+                      )
+                    : null,
+                color: isReady ? null : const Color(0xFF1E293B).withValues(alpha: 0.45),
+                border: Border.all(
+                  color: isReady
+                      ? Color.lerp(
+                          const Color(0xFFF59E0B).withValues(alpha: 0.9),
+                          Colors.white.withValues(alpha: 0.9),
+                          pulseValue,
+                        )!
+                      : Colors.white24,
+                  width: isReady ? 2.2 : 1.2,
+                ),
+                boxShadow: isReady
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.35 + pulseValue * 0.25),
+                          blurRadius: 10 + pulseValue * 5,
+                          spreadRadius: 1 + pulseValue * 1.5,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '💩',
+                        style: TextStyle(
+                          fontSize: widget.size * 0.40,
+                          shadows: isReady
+                              ? const [
+                                  Shadow(
+                                    color: Colors.black54,
+                                    blurRadius: 4,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'POOP',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isReady ? const Color(0xFFFDE68A) : Colors.white38,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          shadows: isReady
+                              ? const [
+                                  Shadow(
+                                    color: Colors.black87,
+                                    blurRadius: 3,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Cooldown or READY Badge
+                  Positioned(
+                    top: -3,
+                    right: -3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: isReady ? const Color(0xFF451A03) : const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isReady ? const Color(0xFFF59E0B) : Colors.white24,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Text(
+                        isReady ? 'READY' : '${widget.cooldown.toStringAsFixed(1)}s',
+                        style: TextStyle(
+                          color: isReady ? const Color(0xFFFDE68A) : Colors.white60,
+                          fontSize: 8.5,
                           fontWeight: FontWeight.w900,
                         ),
                       ),

@@ -57,6 +57,7 @@ class _GameScreenState extends State<GameScreen> {
   final ValueNotifier<({int kills, int deaths})> _scoreNotifier =
       ValueNotifier((kills: 0, deaths: 0));
   final ValueNotifier<int> _fartBombNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<double> _poopCooldownNotifier = ValueNotifier<double>(0.0);
   final ValueNotifier<Weapon> _weaponNotifier =
       ValueNotifier<Weapon>(Weapon.uzi());
   final ValueNotifier<List<KillFeedEntry>> _killFeedNotifier =
@@ -139,6 +140,16 @@ class _GameScreenState extends State<GameScreen> {
       }
     };
 
+    _game.onPoopCooldownChanged = (cooldown, maxCooldown) {
+      if (_poopCooldownNotifier.value != cooldown) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _poopCooldownNotifier.value = cooldown;
+          }
+        });
+      }
+    };
+
     _game.onWeaponStateChanged = (weapon) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -182,6 +193,7 @@ class _GameScreenState extends State<GameScreen> {
     };
 
     _inputController.onFartBombPressed = _triggerFartBomb;
+    _inputController.onPoopPressed = _triggerPoop;
 
     final client = _multiplayerClient;
     if (widget.customMultiplayerClient == null) {
@@ -204,6 +216,10 @@ class _GameScreenState extends State<GameScreen> {
 
   void _triggerFartBomb() {
     _game.triggerLocalFartBomb();
+  }
+
+  void _triggerPoop() {
+    _game.triggerLocalPoop();
   }
 
   void _startMatchTimer() {
@@ -349,6 +365,7 @@ class _GameScreenState extends State<GameScreen> {
     _weaponNotifier.dispose();
     _killFeedNotifier.dispose();
     _lastKillerNameNotifier.dispose();
+    _poopCooldownNotifier.dispose();
     super.dispose();
   }
 
@@ -359,8 +376,13 @@ class _GameScreenState extends State<GameScreen> {
     if (event is KeyDownEvent) {
       _pressedKeys.add(event.logicalKey);
       if (event.logicalKey == LogicalKeyboardKey.keyF ||
-          event.logicalKey == LogicalKeyboardKey.keyB) {
-        _triggerFartBomb();
+          event.logicalKey == LogicalKeyboardKey.keyB ||
+          event.logicalKey == LogicalKeyboardKey.keyP) {
+        if (widget.characterId == 5) {
+          _triggerPoop();
+        } else {
+          _triggerFartBomb();
+        }
       }
       if (event.logicalKey == LogicalKeyboardKey.keyR) {
         _game.reloadLocalWeapon();
@@ -575,12 +597,15 @@ class _GameScreenState extends State<GameScreen> {
                         child: GameWidget(game: _game),
                       ),
 
-                      // 2. Mobile Touch Controls (Joystick, Aim, Jump, Fire, Fart Bomb)
+                      // 2. Mobile Touch Controls (Joystick, Aim, Jump, Fire, Fart Bomb / Jos Poop)
                       Positioned.fill(
                         child: MobileControlsOverlay(
                           inputController: _inputController,
                           fartBombCountListenable: _fartBombNotifier,
                           onFartBombPressed: _triggerFartBomb,
+                          selectedCharacterId: widget.characterId,
+                          poopCooldownListenable: _poopCooldownNotifier,
+                          onPoopPressed: _triggerPoop,
                         ),
                       ),
 

@@ -62,6 +62,7 @@ class MiniMilitiaGame extends FlameGame {
   void Function(double fuel, double maxFuel, bool isSuperFuel)? onFuelChanged;
   void Function(int kills, int deaths)? onScoreChanged;
   void Function(int count)? onFartBombCountChanged;
+  void Function(double cooldown, double maxCooldown)? onPoopCooldownChanged;
   void Function(Weapon weapon)? onWeaponStateChanged;
   void Function({
     required String killerName,
@@ -265,6 +266,11 @@ class MiniMilitiaGame extends FlameGame {
     return localPlayer.blastFartBomb(this);
   }
 
+  /// Trigger the local player's exclusive Jos poop trap
+  bool triggerLocalPoop() {
+    return localPlayer.dropPoop(this);
+  }
+
   void _handlePlayerDeath(PlayerComponent victim) {
     final attackerId = victim.lastAttackerId;
     final weapon = victim.lastAttackerWeapon;
@@ -444,6 +450,14 @@ class MiniMilitiaGame extends FlameGame {
         currentFuelDisplay,
         PlayerComponent.maxJetpackFuel,
         localPlayer.hasSuperFuel,
+      );
+    }
+
+    // Notify Jos poop cooldown
+    if (localPlayer.isJos) {
+      onPoopCooldownChanged?.call(
+        localPlayer.poopCooldownTimer,
+        PlayerComponent.maxPoopCooldown,
       );
     }
 

@@ -37,7 +37,7 @@ class CharacterRegistry {
       name: 'Jos',
       callsign: 'JOS',
       faceAsset: 'assets/characters/face_05.png',
-      description: 'Sharpshooter Jos',
+      description: 'Poop Master Jos - Special Poop Trap Ability (Traps & Stun Enemies!)',
     ),
     CharacterDefinition(
       id: 6,

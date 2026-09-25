@@ -60,6 +60,12 @@ class InputController extends ChangeNotifier {
     onFartBombPressed?.call();
   }
 
+  VoidCallback? onPoopPressed;
+
+  void triggerPoop() {
+    onPoopPressed?.call();
+  }
+
   void reset() {
     moveX = 0.0;
     isJumping = false;
