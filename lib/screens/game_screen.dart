@@ -416,7 +416,7 @@ class _GameScreenState extends State<GameScreen> {
                   Icon(Icons.pause_circle_filled, color: Color(0xFF38BDF8), size: 26),
                   SizedBox(width: 8),
                   Text(
-                    'TACTICAL PAUSE',
+                    'Game Paused',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                   ),
                 ],
@@ -616,7 +616,7 @@ class _GameScreenState extends State<GameScreen> {
                                         ),
                                         const SizedBox(height: 12),
                                         const Text(
-                                          'KIA - RESPAWNING...',
+                                          'RESPAWNING...',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 24,
