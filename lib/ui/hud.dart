@@ -17,8 +17,15 @@ class GameHud extends StatelessWidget {
   final int remainingSeconds;
   final int fartBombCount;
   final bool isSuperFuel;
+  final String weaponName;
+  final double weaponZoom;
+  final int currentAmmo;
+  final int maxAmmo;
+  final bool isReloading;
+  final double reloadProgress;
   final VoidCallback onPausePressed;
   final VoidCallback? onScoreboardPressed;
+  final VoidCallback? onReloadPressed;
 
   const GameHud({
     super.key,
@@ -34,8 +41,15 @@ class GameHud extends StatelessWidget {
     this.remainingSeconds = 180,
     this.fartBombCount = 0,
     this.isSuperFuel = false,
+    this.weaponName = 'Uzi',
+    this.weaponZoom = 2.0,
+    this.currentAmmo = 25,
+    this.maxAmmo = 25,
+    this.isReloading = false,
+    this.reloadProgress = 1.0,
     required this.onPausePressed,
     this.onScoreboardPressed,
+    this.onReloadPressed,
   });
 
   @override
@@ -49,11 +63,12 @@ class GameHud extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 1. TOP-LEFT: Health, Avatar, and Player Info + Fart Bomb inventory
+            // 1. TOP-LEFT: Health, Avatar, Player Info, Weapon & Fart Bomb
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildPlayerCard(character),
+                _buildWeaponIndicator(),
                 _buildFartBombIndicator(),
               ],
             ),
@@ -67,6 +82,99 @@ class GameHud extends StatelessWidget {
                 _buildPauseButton(),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeaponIndicator() {
+    return GestureDetector(
+      onTap: onReloadPressed,
+      child: Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isReloading ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8).withValues(alpha: 0.6),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (isReloading ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8)).withValues(alpha: 0.25),
+              blurRadius: 6,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  weaponName.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    '${weaponZoom.toStringAsFixed(1)}x',
+                    style: const TextStyle(
+                      color: Color(0xFF38BDF8),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            if (isReloading)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 8,
+                    height: 8,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      valueColor: AlwaysStoppedAnimation(Color(0xFFF59E0B)),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'RELOAD ${(reloadProgress * 100).toInt()}%',
+                    style: const TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              )
+            else
+              Text(
+                'AMMO: $currentAmmo / $maxAmmo',
+                style: TextStyle(
+                  color: currentAmmo <= 2 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                  fontSize: 9.0,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
           ],
         ),
       ),

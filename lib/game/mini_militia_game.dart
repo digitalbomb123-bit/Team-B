@@ -8,8 +8,10 @@ import '../multiplayer/player_state.dart';
 import 'camera/game_camera.dart';
 import 'components/fart_bomb_pickup.dart';
 import 'components/floating_text.dart';
+import 'components/gun_pickup.dart';
 import 'components/jetpack_fuel_pickup.dart';
 import 'components/player.dart';
+import 'components/weapon.dart';
 import 'systems/collision_system.dart';
 import 'systems/combat_system.dart';
 import 'world/arena.dart';
@@ -46,6 +48,7 @@ class MiniMilitiaGame extends FlameGame {
   void Function(double fuel, double maxFuel, bool isSuperFuel)? onFuelChanged;
   void Function(int kills, int deaths)? onScoreChanged;
   void Function(int count)? onFartBombCountChanged;
+  void Function(Weapon weapon)? onWeaponStateChanged;
   void Function({
     required String killerName,
     required String victimName,
@@ -104,11 +107,15 @@ class MiniMilitiaGame extends FlameGame {
         onHealthChanged?.call(p.health, p.maxHealth);
       },
     );
+    localPlayer.onWeaponChanged = (w) {
+      setZoom(w.zoom);
+      onWeaponStateChanged?.call(w);
+    };
     await world.add(localPlayer);
 
     // 4. Configure Camera & Viewport
     camera.viewfinder.position = localPlayer.position.clone();
-    camera.viewfinder.zoom = GameCameraConfig.cameraZoom;
+    setZoom(localPlayer.weapon.zoom);
     camera.follow(localPlayer);
 
     // 5. Connect multiplayer listeners
@@ -119,6 +126,9 @@ class MiniMilitiaGame extends FlameGame {
     spawnFartBombPickup();
     spawnJetpackFuelPickup();
     spawnJetpackFuelPickup();
+
+    // 7. Spawn Weapon Pickups on tactical platforms
+    spawnGunPickups();
 
     _initialized = true;
   }
@@ -173,6 +183,40 @@ class MiniMilitiaGame extends FlameGame {
       },
     );
     world.add(pickup);
+  }
+
+  /// Spawn gun pickups across various strategic platforms
+  void spawnGunPickups() {
+    // High Sniper Tower: AWP (6.0x Scope, 100 DMG)
+    _spawnSpecificGun(WeaponType.awp, Vector2(1180, 435));
+    // Mid Platform Left: AK-47 (2.5x Zoom, 35 DMG)
+    _spawnSpecificGun(WeaponType.ak47, Vector2(680, 615));
+    // Mid Platform Right: M4A1 (3.0x Zoom, 28 DMG)
+    _spawnSpecificGun(WeaponType.m4a1, Vector2(1650, 615));
+    // Low Platform Center: Desert Eagle (2.0x Zoom, 60 DMG)
+    _spawnSpecificGun(WeaponType.desertEagle, Vector2(1200, 795));
+    // Low Platform Left: Uzi (2.0x Zoom, 20 DMG)
+    _spawnSpecificGun(WeaponType.uzi, Vector2(400, 815));
+  }
+
+  void _spawnSpecificGun(WeaponType type, Vector2 pos) {
+    final pickup = GunPickupComponent(
+      position: pos,
+      weaponType: type,
+      onCollected: () {
+        Future.delayed(const Duration(seconds: 15), () {
+          if (isMounted) {
+            _spawnSpecificGun(type, pos);
+          }
+        });
+      },
+    );
+    world.add(pickup);
+  }
+
+  /// Manually trigger reload for local player's gun
+  void reloadLocalWeapon() {
+    localPlayer.reloadWeapon();
   }
 
   /// Trigger the local player's fart bomb blast
@@ -368,6 +412,9 @@ class MiniMilitiaGame extends FlameGame {
       players: allPlayers,
       platforms: arena.platforms,
     );
+
+    // Notify weapon state (ammo, reloading)
+    onWeaponStateChanged?.call(localPlayer.weapon);
 
     // 4. Broadcast Local Player State Over Network
     multiplayerClient.sendPlayerUpdate(

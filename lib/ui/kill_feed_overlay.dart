@@ -24,12 +24,24 @@ class KillFeedEntry {
     if (weapon == 'fart_bomb') {
       return 'fart-bombed';
     }
+    if (weapon == 'AWP') {
+      return 'sniped';
+    }
     return 'eliminated';
   }
 
   String get weaponIcon {
     if (weapon == 'fart_bomb') {
       return '💨';
+    }
+    if (weapon == 'AWP') {
+      return '🔭';
+    }
+    if (weapon == 'Desert Eagle') {
+      return '💥';
+    }
+    if (weapon == 'AK-47' || weapon == 'M4A1') {
+      return '⚡';
     }
     return '🎯';
   }

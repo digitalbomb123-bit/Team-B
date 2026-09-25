@@ -37,6 +37,7 @@ class CombatSystem {
     final bullet = BulletComponent(
       bulletId: bulletId,
       shooterId: shooter.playerId,
+      weaponName: shotData.weaponName,
       position: shotData.muzzlePosition,
       angle: shotData.angle,
       speed: shotData.speed,
@@ -96,7 +97,11 @@ class CombatSystem {
       // 2. Check player hit
       final hitPlayer = CollisionSystem.checkBulletPlayerCollision(bullet, players);
       if (hitPlayer != null) {
-        hitPlayer.takeDamage(bullet.damage, attackerId: bullet.shooterId);
+        hitPlayer.takeDamage(
+          bullet.damage,
+          attackerId: bullet.shooterId,
+          weapon: bullet.weaponName,
+        );
 
         // Report damage over network
         multiplayerClient.sendDamageEvent(

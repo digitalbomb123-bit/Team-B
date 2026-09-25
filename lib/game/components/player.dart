@@ -9,6 +9,7 @@ import '../mini_militia_game.dart';
 import 'floating_text.dart';
 import 'toxic_gas_cloud.dart';
 import 'weapon.dart';
+import '../../audio/audio_manager.dart';
 
 enum PlayerAnimState {
   idle,
@@ -47,7 +48,8 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   bool isGrounded = false;
 
   // Weapon & Combat
-  final Weapon weapon = Weapon();
+  Weapon weapon = Weapon.uzi();
+  void Function(Weapon)? onWeaponChanged;
   double muzzleFlashTimer = 0.0;
   double respawnCountdown = 0.0;
   static const double respawnDuration = 3.0;
@@ -281,7 +283,21 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     velocity.setZero();
     currentAnimation = PlayerAnimState.death;
     respawnCountdown = respawnDuration;
+    if (isLocal) {
+      AudioManager.playDeathSound();
+    }
     onDeath?.call(this);
+  }
+
+  /// Equips a new weapon (e.g. from map pickup)
+  void equipWeapon(Weapon newWeapon) {
+    weapon = newWeapon;
+    onWeaponChanged?.call(weapon);
+  }
+
+  /// Manually trigger weapon reload
+  void reloadWeapon() {
+    weapon.startReload();
   }
 
   /// Respawn player with full health
@@ -622,23 +638,64 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     final paintGunStock = Paint()..color = const Color(0xFF475569);
     final paintGunDetail = Paint()..color = const Color(0xFF0F172A);
 
-    // Rifle Receiver & Stock
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(-6, -3, 14, 6), const Radius.circular(2)),
-      paintGunStock,
-    );
+    switch (weapon.type) {
+      case WeaponType.awp:
+        // AWP: Long Sniper with large scope and green/black body
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(-8, -3, 14, 6), const Radius.circular(2)),
+          Paint()..color = const Color(0xFF14532D), // Green sniper body
+        );
+        canvas.drawRect(const Rect.fromLTWH(6, -2, 28, 4), paintMetal); // Long heavy barrel
+        canvas.drawRect(const Rect.fromLTWH(0, -7, 14, 3), Paint()..color = const Color(0xFF38BDF8)); // Scope
+        canvas.drawRect(const Rect.fromLTWH(2, 2, 4, 6), paintGunDetail);
+        break;
 
-    // Rifle Barrel
-    canvas.drawRect(const Rect.fromLTWH(8, -2, 18, 4), paintMetal);
+      case WeaponType.desertEagle:
+        // Desert Eagle: Heavy Chrome Handgun
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(-2, -4, 16, 7), const Radius.circular(2)),
+          Paint()..color = const Color(0xFF94A3B8), // Chrome slide
+        );
+        canvas.drawRect(const Rect.fromLTWH(-1, 2, 5, 8), paintGunDetail); // Grip
+        break;
 
-    // Ammo Magazine
-    canvas.save();
-    canvas.rotate(0.2);
-    canvas.drawRect(const Rect.fromLTWH(2, 2, 4, 8), paintGunDetail);
-    canvas.restore();
+      case WeaponType.ak47:
+        // AK-47: Wooden buttstock, dark receiver, curved banana mag
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(-7, -3, 13, 6), const Radius.circular(2)),
+          Paint()..color = const Color(0xFFB45309), // Wood stock
+        );
+        canvas.drawRect(const Rect.fromLTWH(6, -2, 20, 4), paintMetal);
+        canvas.save();
+        canvas.rotate(0.35);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(1, 1, 4, 10), const Radius.circular(1.5)),
+          paintGunDetail,
+        );
+        canvas.restore();
+        break;
 
-    // Rifle Scope / Sight
-    canvas.drawRect(const Rect.fromLTWH(2, -5, 8, 2), paintGunDetail);
+      case WeaponType.m4a1:
+        // M4A1: Modern tactical carbine with optic
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(-6, -3, 14, 6), const Radius.circular(2)),
+          paintGunStock,
+        );
+        canvas.drawRect(const Rect.fromLTWH(8, -2, 19, 4), paintMetal);
+        canvas.drawRect(const Rect.fromLTWH(2, -6, 8, 2.5), Paint()..color = const Color(0xFF38BDF8)); // Optic sight
+        canvas.drawRect(const Rect.fromLTWH(3, 2, 4, 8), paintGunDetail);
+        break;
+
+      case WeaponType.uzi:
+        // Uzi: Compact SMG
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(-4, -4, 16, 7), const Radius.circular(2)),
+          paintMetal,
+        );
+        canvas.drawRect(const Rect.fromLTWH(10, -2, 10, 3.5), paintGunStock);
+        canvas.drawRect(const Rect.fromLTWH(2, 2, 4, 10), paintGunDetail); // Straight vertical mag
+        break;
+    }
 
     // Soldier Hand gripping weapon
     final paintHand = Paint()..color = const Color(0xFFE2B897);
@@ -646,13 +703,14 @@ class PlayerComponent extends PositionComponent with HasGameReference {
 
     // Muzzle Flash Effect
     if (muzzleFlashTimer > 0) {
+      final muzzleX = weapon.barrelLength;
       final paintFlash = Paint()
         ..color = const Color(0xFFFFCC00).withValues(alpha: 0.9)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-      canvas.drawCircle(const Offset(27, 0), 7, paintFlash);
+      canvas.drawCircle(Offset(muzzleX, 0), 7, paintFlash);
 
       final paintCore = Paint()..color = Colors.white;
-      canvas.drawCircle(const Offset(27, 0), 3, paintCore);
+      canvas.drawCircle(Offset(muzzleX, 0), 3, paintCore);
     }
 
     canvas.restore();

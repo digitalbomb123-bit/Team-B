@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 class BulletComponent extends PositionComponent {
   final String bulletId;
   final String shooterId;
+  final String weaponName;
   final Vector2 velocity;
   final double damage;
   final double lifetime;
@@ -16,6 +17,7 @@ class BulletComponent extends PositionComponent {
   BulletComponent({
     required this.bulletId,
     required this.shooterId,
+    this.weaponName = 'bullet',
     required Vector2 position,
     required double angle,
     required double speed,

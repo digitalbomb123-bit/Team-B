@@ -4,9 +4,9 @@ import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../game/camera/game_camera.dart';
 import '../controls/input_controller.dart';
 import '../controls/mobile_controls.dart';
+import '../game/components/weapon.dart';
 import '../game/mini_militia_game.dart';
 import '../multiplayer/mock_multiplayer_client.dart';
 import '../multiplayer/multiplayer_client.dart';
@@ -57,6 +57,8 @@ class _GameScreenState extends State<GameScreen> {
   final ValueNotifier<({int kills, int deaths})> _scoreNotifier =
       ValueNotifier((kills: 0, deaths: 0));
   final ValueNotifier<int> _fartBombNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<Weapon> _weaponNotifier =
+      ValueNotifier<Weapon>(Weapon.uzi());
   final ValueNotifier<List<KillFeedEntry>> _killFeedNotifier =
       ValueNotifier<List<KillFeedEntry>>([]);
   final ValueNotifier<String?> _lastKillerNameNotifier =
@@ -65,7 +67,6 @@ class _GameScreenState extends State<GameScreen> {
   late int _remainingMatchSeconds;
   Timer? _matchTimer;
   bool _matchFinished = false;
-  double _currentZoom = GameCameraConfig.cameraZoom;
 
   // Desktop keyboard key state tracking
   final Set<LogicalKeyboardKey> _pressedKeys = {};
@@ -136,6 +137,14 @@ class _GameScreenState extends State<GameScreen> {
           }
         });
       }
+    };
+
+    _game.onWeaponStateChanged = (weapon) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _weaponNotifier.value = weapon;
+        }
+      });
     };
 
     _game.onKillFeedEvent = ({
@@ -337,6 +346,7 @@ class _GameScreenState extends State<GameScreen> {
     _fuelNotifier.dispose();
     _scoreNotifier.dispose();
     _fartBombNotifier.dispose();
+    _weaponNotifier.dispose();
     _killFeedNotifier.dispose();
     _lastKillerNameNotifier.dispose();
     super.dispose();
@@ -351,6 +361,9 @@ class _GameScreenState extends State<GameScreen> {
       if (event.logicalKey == LogicalKeyboardKey.keyF ||
           event.logicalKey == LogicalKeyboardKey.keyB) {
         _triggerFartBomb();
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyR) {
+        _game.reloadLocalWeapon();
       }
     } else if (event is KeyUpEvent) {
       _pressedKeys.remove(event.logicalKey);
@@ -403,66 +416,102 @@ class _GameScreenState extends State<GameScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF0F172A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+        final weapon = _weaponNotifier.value;
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.pause_circle_filled, color: Color(0xFF38BDF8), size: 26),
+              SizedBox(width: 8),
+              Text(
+                'Game Paused',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
               ),
-              title: const Row(
-                children: [
-                  Icon(Icons.pause_circle_filled, color: Color(0xFF38BDF8), size: 26),
-                  SizedBox(width: 8),
-                  Text(
-                    'Game Paused',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Camera Zoom Slider
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Camera Zoom:', style: TextStyle(color: Colors.white70)),
-                      Text(
-                        '${_currentZoom.toStringAsFixed(2)}x',
-                        style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Equipped Weapon Info (Camera Zoom is now tied directly to active gun)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
-                  ),
-                  Slider(
-                    value: _currentZoom,
-                    min: 0.8,
-                    max: 1.6,
-                    divisions: 8,
-                    activeColor: const Color(0xFF38BDF8),
-                    onChanged: (val) {
-                      setModalState(() => _currentZoom = val);
-                      setState(() {
-                        _currentZoom = val;
-                        _game.setZoom(val);
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'CONTROLS:',
-                    style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '• Mobile: Left Joystick (Move/Fly), Right Drag (Aim), JUMP, FIRE & FART BOMB\n• Desktop: A/D (Move), W/Space (Jump), F/B (Fart Bomb), Mouse (Aim), Left Click (Fire)',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                  ),
-                ],
+                      child: const Icon(Icons.gps_fixed, color: Color(0xFF38BDF8), size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                weapon.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${weapon.zoom.toStringAsFixed(1)}× Zoom',
+                                  style: const TextStyle(
+                                    color: Color(0xFF38BDF8),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Damage: ${weapon.damage.toInt()} | Reload: ${weapon.reloadDuration.toStringAsFixed(1)}s',
+                            style: const TextStyle(color: Colors.white60, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              actions: [
+              const SizedBox(height: 12),
+              const Text(
+                'CONTROLS:',
+                style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '• Mobile: Left Joystick (Move/Fly), Right Drag (Aim), JUMP, FIRE & FART BOMB\n• Desktop: A/D (Move), W/Space (Jump), R (Reload), F/B (Fart Bomb), Mouse (Aim), Left Click (Fire)',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+              ),
+            ],
+          ),
+          actions: [
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
@@ -500,9 +549,7 @@ class _GameScreenState extends State<GameScreen> {
             );
           },
         );
-      },
-    );
-  }
+      }
 
   @override
   Widget build(BuildContext context) {
@@ -557,21 +604,33 @@ class _GameScreenState extends State<GameScreen> {
                                         return ValueListenableBuilder<int>(
                                           valueListenable: _fartBombNotifier,
                                           builder: (context, fartBombCount, _) {
-                                            return GameHud(
-                                              currentHealth: health,
-                                              maxHealth: 100.0,
-                                              currentFuel: fuelState.fuel,
-                                              maxFuel: 100.0,
-                                              isSuperFuel: fuelState.isSuperFuel,
-                                              kills: score.kills,
-                                              deaths: score.deaths,
-                                              characterId: widget.characterId,
-                                              playerName: widget.playerName,
-                                              totalPlayers: widget.botCount + 1,
-                                              remainingSeconds: remainingSec,
-                                              fartBombCount: fartBombCount,
-                                              onPausePressed: _showPauseDialog,
-                                              onScoreboardPressed: _showLiveScoreboard,
+                                            return ValueListenableBuilder<Weapon>(
+                                              valueListenable: _weaponNotifier,
+                                              builder: (context, weapon, _) {
+                                                return GameHud(
+                                                  currentHealth: health,
+                                                  maxHealth: 100.0,
+                                                  currentFuel: fuelState.fuel,
+                                                  maxFuel: 100.0,
+                                                  isSuperFuel: fuelState.isSuperFuel,
+                                                  kills: score.kills,
+                                                  deaths: score.deaths,
+                                                  characterId: widget.characterId,
+                                                  playerName: widget.playerName,
+                                                  totalPlayers: widget.botCount + 1,
+                                                  remainingSeconds: remainingSec,
+                                                  fartBombCount: fartBombCount,
+                                                  weaponName: weapon.name,
+                                                  weaponZoom: weapon.zoom,
+                                                  currentAmmo: weapon.currentAmmo,
+                                                  maxAmmo: weapon.magazineCapacity,
+                                                  isReloading: weapon.isReloading,
+                                                  reloadProgress: weapon.reloadProgress,
+                                                  onReloadPressed: _game.reloadLocalWeapon,
+                                                  onPausePressed: _showPauseDialog,
+                                                  onScoreboardPressed: _showLiveScoreboard,
+                                                );
+                                              },
                                             );
                                           },
                                         );
