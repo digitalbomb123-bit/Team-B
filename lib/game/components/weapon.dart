@@ -15,7 +15,9 @@ class Weapon {
   final WeaponType type;
   final String name;
   final double damage;
-  final double zoom;
+  double zoom; // mutable zoom
+  final List<double> zoomLevels; // possible zoom levels
+  int _zoomIndex = 0;
   final double reloadDuration;
   final int magazineCapacity;
   final double fireRate; // Shots per second
@@ -34,6 +36,7 @@ class Weapon {
     this.name = 'Uzi',
     this.damage = 20.0,
     this.zoom = 2.0,
+    this.zoomLevels = const [2.0],
     this.reloadDuration = 1.5,
     this.magazineCapacity = 25,
     this.fireRate = 10.0,
@@ -133,6 +136,7 @@ class Weapon {
       name: 'AWP',
       damage: 100.0,
       zoom: 6.0,
+      zoomLevels: const [6.0, 3.0, 2.0],
       reloadDuration: 3.0,
       magazineCapacity: 5,
       fireRate: 0.85,
@@ -209,6 +213,37 @@ class Weapon {
       damage: damage,
       lifetime: bulletLifetime,
     );
+  }
+
+  /// Cycle zoom level for weapons supporting multiple zooms.
+  void cycleZoom() {
+    if (zoomLevels.length <= 1) return;
+    _zoomIndex = (_zoomIndex + 1) % zoomLevels.length;
+    zoom = zoomLevels[_zoomIndex];
+  }
+
+  /// Creates a shallow clone of the weapon state for reactive UI updates
+  Weapon clone() {
+    final w = Weapon(
+      type: type,
+      name: name,
+      damage: damage,
+      zoom: zoom,
+      zoomLevels: zoomLevels,
+      reloadDuration: reloadDuration,
+      magazineCapacity: magazineCapacity,
+      fireRate: fireRate,
+      bulletSpeed: bulletSpeed,
+      bulletLifetime: bulletLifetime,
+      spreadAngle: spreadAngle,
+      barrelLength: barrelLength,
+    );
+    w._zoomIndex = _zoomIndex;
+    w.currentAmmo = currentAmmo;
+    w._cooldown = _cooldown;
+    w.reloadTimer = reloadTimer;
+    w.isReloading = isReloading;
+    return w;
   }
 
   void resetCooldown() {

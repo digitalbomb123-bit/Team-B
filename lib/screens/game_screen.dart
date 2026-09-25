@@ -142,7 +142,7 @@ class _GameScreenState extends State<GameScreen> {
     _game.onWeaponStateChanged = (weapon) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _weaponNotifier.value = weapon;
+          _weaponNotifier.value = weapon.clone();
         }
       });
     };
@@ -628,6 +628,7 @@ class _GameScreenState extends State<GameScreen> {
                                                   reloadProgress: weapon.reloadProgress,
                                                   onReloadPressed: _game.reloadLocalWeapon,
                                                   onPausePressed: _showPauseDialog,
+                                                  onZoomPressed: _game.toggleZoom,
                                                   onScoreboardPressed: _showLiveScoreboard,
                                                 );
                                               },

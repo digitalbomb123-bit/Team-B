@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:team_b_shooter/game/camera/game_camera.dart';
 import 'package:team_b_shooter/game/components/bullet.dart';
 import 'package:team_b_shooter/game/components/gun_pickup.dart';
 import 'package:team_b_shooter/game/components/scenery_elements.dart';
@@ -90,6 +91,61 @@ void main() {
         weaponName: 'AWP',
       );
       expect(bullet.weaponName, 'AWP');
+    });
+
+    test('AWP multi-stage zoom cycles correctly through 6x, 3x, and 2x', () {
+      final awp = Weapon.awp();
+      expect(awp.zoom, 6.0);
+      expect(awp.zoomLevels, [6.0, 3.0, 2.0]);
+
+      // Cycle to next zoom: 3x
+      awp.cycleZoom();
+      expect(awp.zoom, 3.0);
+
+      // Cycle to next zoom: 2x
+      awp.cycleZoom();
+      expect(awp.zoom, 2.0);
+
+      // Cycle back to: 6x
+      awp.cycleZoom();
+      expect(awp.zoom, 6.0);
+    });
+
+    test('Camera zoom config maps higher weapon zoom to wider view (zoom out)', () {
+      // 1.0x (normal/unzoomed)
+      final zoom1x = GameCameraConfig.getCameraZoomForWeaponZoom(1.0);
+      expect(zoom1x, 1.0);
+
+      // 2.0x (Uzi / Deagle / AWP 2x)
+      final zoom2x = GameCameraConfig.getCameraZoomForWeaponZoom(2.0);
+
+      // 3.0x (M4A1 / AWP 3x)
+      final zoom3x = GameCameraConfig.getCameraZoomForWeaponZoom(3.0);
+
+      // 6.0x (AWP 6x)
+      final zoom6x = GameCameraConfig.getCameraZoomForWeaponZoom(6.0);
+
+      // Higher weapon zoom must have smaller camera viewfinder zoom (reveals more arena)
+      expect(zoom1x, greaterThan(zoom2x));
+      expect(zoom2x, greaterThan(zoom3x));
+      expect(zoom3x, greaterThan(zoom6x));
+      expect(zoom6x, greaterThanOrEqualTo(0.45)); // Clamped to fit arena bounds
+    });
+
+    test('Weapon clone creates accurate independent state copy', () {
+      final awp = Weapon.awp();
+      awp.currentAmmo = 2;
+      awp.cycleZoom(); // now 3.0
+
+      final cloned = awp.clone();
+      expect(cloned.name, 'AWP');
+      expect(cloned.zoom, 3.0);
+      expect(cloned.currentAmmo, 2);
+
+      // Modifying original does not affect clone
+      awp.cycleZoom(); // now 2.0
+      expect(awp.zoom, 2.0);
+      expect(cloned.zoom, 3.0);
     });
   });
 

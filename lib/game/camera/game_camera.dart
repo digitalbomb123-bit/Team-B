@@ -6,6 +6,15 @@ class GameCameraConfig {
   /// Higher values zoom in closer, lower values reveal more of the arena.
   static double cameraZoom = 1.1;
 
+  /// Convert weapon zoom level (e.g. 2.0x, 2.5x, 3.0x, 6.0x) into Flame camera viewfinder zoom.
+  /// Higher weapon zoom = wider tactical FOV (zoomed out).
+  static double getCameraZoomForWeaponZoom(double weaponZoom) {
+    if (weaponZoom <= 1.0) return 1.0;
+    // Maps 1.0x -> 1.0, 2.0x -> ~0.82, 3.0x -> ~0.69, 6.0x -> ~0.48
+    final zoomOut = 1.0 / (1.0 + (weaponZoom - 1.0) * 0.22);
+    return zoomOut.clamp(0.48, 1.1);
+  }
+
   /// Logical game viewport dimensions.
   /// The game renders at this logical coordinate resolution and scales responsively.
   static const double logicalWidth = 960.0;

@@ -24,6 +24,7 @@ class GameHud extends StatelessWidget {
   final bool isReloading;
   final double reloadProgress;
   final VoidCallback onPausePressed;
+  final VoidCallback? onZoomPressed;
   final VoidCallback? onScoreboardPressed;
   final VoidCallback? onReloadPressed;
 
@@ -48,6 +49,7 @@ class GameHud extends StatelessWidget {
     this.isReloading = false,
     this.reloadProgress = 1.0,
     required this.onPausePressed,
+    this.onZoomPressed,
     this.onScoreboardPressed,
     this.onReloadPressed,
   });
@@ -58,7 +60,7 @@ class GameHud extends StatelessWidget {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -73,12 +75,14 @@ class GameHud extends StatelessWidget {
               ],
             ),
 
-            // 2. TOP-RIGHT: Kill Count, Match Timer & Tactical Pause
+            // 2. TOP-RIGHT: Kill Count, Match Timer, Scope Zoom & Tactical Pause
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildScoreBadge(),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                _buildZoomButton(),
+                const SizedBox(width: 6),
                 _buildPauseButton(),
               ],
             ),
@@ -433,6 +437,58 @@ class GameHud extends StatelessWidget {
             Icons.pause_rounded,
             color: Colors.white,
             size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildZoomButton() {
+    final zoomText = weaponZoom % 1 == 0
+        ? '${weaponZoom.toInt()}x'
+        : '${weaponZoom.toStringAsFixed(1)}x';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onZoomPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFF38BDF8).withValues(alpha: 0.7),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.zoom_out_map_rounded,
+                color: Color(0xFF38BDF8),
+                size: 17,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                zoomText,
+                style: const TextStyle(
+                  color: Color(0xFF38BDF8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
         ),
       ),

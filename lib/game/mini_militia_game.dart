@@ -441,10 +441,18 @@ class MiniMilitiaGame extends FlameGame {
     );
   }
 
-  /// Change camera zoom at runtime (e.g., from settings or responsiveness)
-  void setZoom(double newZoom) {
-    GameCameraConfig.cameraZoom = newZoom;
-    camera.viewfinder.zoom = newZoom;
+  /// Change camera zoom at runtime based on weapon zoom level
+  void setZoom(double weaponZoom) {
+    final cameraZoom = GameCameraConfig.getCameraZoomForWeaponZoom(weaponZoom);
+    GameCameraConfig.cameraZoom = cameraZoom;
+    camera.viewfinder.zoom = cameraZoom;
+  }
+
+  /// Toggle weapon zoom (cycle levels) and update camera.
+  void toggleZoom() {
+    localPlayer.weapon.cycleZoom();
+    setZoom(localPlayer.weapon.zoom);
+    onWeaponStateChanged?.call(localPlayer.weapon);
   }
 
   @override
