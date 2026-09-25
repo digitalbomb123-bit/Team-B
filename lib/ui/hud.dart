@@ -16,6 +16,7 @@ class GameHud extends StatelessWidget {
   final int totalPlayers;
   final int remainingSeconds;
   final int fartBombCount;
+  final bool isSuperFuel;
   final VoidCallback onPausePressed;
   final VoidCallback? onScoreboardPressed;
 
@@ -32,6 +33,7 @@ class GameHud extends StatelessWidget {
     this.totalPlayers = 10,
     this.remainingSeconds = 180,
     this.fartBombCount = 0,
+    this.isSuperFuel = false,
     required this.onPausePressed,
     this.onScoreboardPressed,
   });
@@ -56,11 +58,15 @@ class GameHud extends StatelessWidget {
               ],
             ),
 
-            // 2. TOP-CENTER: Kills, Deaths, Score & Match Info
-            _buildScoreBadge(),
-
-            // 3. TOP-RIGHT: Pause & Settings Button
-            _buildPauseButton(),
+            // 2. TOP-RIGHT: Kill Count, Match Timer & Tactical Pause
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildScoreBadge(),
+                const SizedBox(width: 8),
+                _buildPauseButton(),
+              ],
+            ),
           ],
         ),
       ),
@@ -198,10 +204,19 @@ class GameHud extends StatelessWidget {
 
   Widget _buildFuelBar() {
     final ratio = (currentFuel / maxFuel).clamp(0.0, 1.0);
+    final iconColor = isSuperFuel ? const Color(0xFF38BDF8) : const Color(0xFFF97316);
+    final barColors = isSuperFuel
+        ? const [Color(0xFF38BDF8), Color(0xFF00F0FF)]
+        : const [Color(0xFFFF7A00), Color(0xFFFFB800)];
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.rocket_launch_rounded, color: Color(0xFFF97316), size: 10),
+        Icon(
+          isSuperFuel ? Icons.bolt_rounded : Icons.rocket_launch_rounded,
+          color: iconColor,
+          size: 10,
+        ),
         const SizedBox(width: 4),
         Container(
           width: 116,
@@ -209,7 +224,7 @@ class GameHud extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A),
             borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: const Color(0xFFF97316).withValues(alpha: 0.5), width: 1),
+            border: Border.all(color: iconColor.withValues(alpha: 0.6), width: 1),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
@@ -217,12 +232,10 @@ class GameHud extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF7A00), Color(0xFFFFB800)],
-                ),
+                gradient: LinearGradient(colors: barColors),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF7A00).withValues(alpha: 0.6),
+                    color: iconColor.withValues(alpha: 0.6),
                     blurRadius: 4,
                   ),
                 ],
@@ -239,9 +252,9 @@ class GameHud extends StatelessWidget {
       onTap: onScoreboardPressed,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+          color: const Color(0xFF0F172A).withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
@@ -263,41 +276,9 @@ class GameHud extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Container(width: 1, height: 16, color: Colors.white24),
-            const SizedBox(width: 12),
-
-            // Deaths
-            const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 16),
-            const SizedBox(width: 4),
-            Text(
-              '$deaths',
-              style: const TextStyle(
-                color: Color(0xFFCBD5E1),
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(width: 12),
-            Container(width: 1, height: 16, color: Colors.white24),
-            const SizedBox(width: 12),
-
-            // Player Count
-            const Icon(Icons.people_alt_rounded, color: Color(0xFF38BDF8), size: 16),
-            const SizedBox(width: 4),
-            Text(
-              '$totalPlayers / 10',
-              style: const TextStyle(
-                color: Color(0xFF38BDF8),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(width: 12),
-            Container(width: 1, height: 16, color: Colors.white24),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
 
             // Match Countdown Timer
             ..._buildMatchTimer(),

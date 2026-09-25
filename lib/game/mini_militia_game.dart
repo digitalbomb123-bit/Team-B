@@ -7,6 +7,7 @@ import '../multiplayer/multiplayer_client.dart';
 import '../multiplayer/player_state.dart';
 import 'camera/game_camera.dart';
 import 'components/fart_bomb_pickup.dart';
+import 'components/jetpack_fuel_pickup.dart';
 import 'components/player.dart';
 import 'systems/collision_system.dart';
 import 'systems/combat_system.dart';
@@ -36,11 +37,12 @@ class MiniMilitiaGame extends FlameGame {
   int deaths = 0;
   double _lastReportedHealth = -1;
   double _lastReportedFuel = -1;
+  bool _lastReportedSuperFuel = false;
   bool _initialized = false;
 
   // Status callbacks for UI
   void Function(double health, double maxHealth)? onHealthChanged;
-  void Function(double fuel, double maxFuel)? onFuelChanged;
+  void Function(double fuel, double maxFuel, bool isSuperFuel)? onFuelChanged;
   void Function(int kills, int deaths)? onScoreChanged;
   void Function(int count)? onFartBombCountChanged;
 
@@ -103,9 +105,11 @@ class MiniMilitiaGame extends FlameGame {
     // 5. Connect multiplayer listeners
     _setupNetworkListeners();
 
-    // 6. Spawn initial random Fart Bomb pickups on arena platforms
+    // 6. Spawn initial random Fart Bomb and Jetpack Fuel pickups on arena platforms
     spawnFartBombPickup();
     spawnFartBombPickup();
+    spawnJetpackFuelPickup();
+    spawnJetpackFuelPickup();
 
     _initialized = true;
   }
@@ -129,6 +133,32 @@ class MiniMilitiaGame extends FlameGame {
         Future.delayed(const Duration(seconds: 12), () {
           if (isMounted) {
             spawnFartBombPickup();
+          }
+        });
+      },
+    );
+    world.add(pickup);
+  }
+
+  /// Spawns an Additional Jetpack Fuel pickup on a random arena platform
+  void spawnJetpackFuelPickup() {
+    final rnd = Random();
+    final validPlatforms = arena.platforms
+        .where((p) => p.size.x >= 120 && p.position.y > 100 && p.position.y < 1000)
+        .toList();
+    if (validPlatforms.isEmpty) return;
+
+    final plat = validPlatforms[rnd.nextInt(validPlatforms.length)];
+    final x = plat.position.x + 30 + rnd.nextDouble() * max(20.0, plat.size.x - 60);
+    final y = plat.position.y - 12;
+
+    final pickup = JetpackFuelPickupComponent(
+      position: Vector2(x, y),
+      onCollected: () {
+        // Schedule next random fuel pickup after 14 seconds
+        Future.delayed(const Duration(seconds: 14), () {
+          if (isMounted) {
+            spawnJetpackFuelPickup();
           }
         });
       },
@@ -245,9 +275,18 @@ class MiniMilitiaGame extends FlameGame {
     }
 
     // Notify HUD when jetpack fuel changes
-    if ((localPlayer.jetpackFuel - _lastReportedFuel).abs() > 0.5) {
-      _lastReportedFuel = localPlayer.jetpackFuel;
-      onFuelChanged?.call(localPlayer.jetpackFuel, PlayerComponent.maxJetpackFuel);
+    final currentFuelDisplay = localPlayer.superFuelTimer > 0
+        ? (localPlayer.superFuelTimer / 10.0 * PlayerComponent.maxJetpackFuel)
+        : localPlayer.jetpackFuel;
+    if ((currentFuelDisplay - _lastReportedFuel).abs() > 0.5 ||
+        localPlayer.hasSuperFuel != _lastReportedSuperFuel) {
+      _lastReportedFuel = currentFuelDisplay;
+      _lastReportedSuperFuel = localPlayer.hasSuperFuel;
+      onFuelChanged?.call(
+        currentFuelDisplay,
+        PlayerComponent.maxJetpackFuel,
+        localPlayer.hasSuperFuel,
+      );
     }
 
     // 3. Update Combat System & Bullet Hits

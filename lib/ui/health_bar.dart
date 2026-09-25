@@ -64,22 +64,6 @@ class HudHealthBar extends StatelessWidget {
               ),
             ),
           ),
-
-          // HP Numbers Text
-          Center(
-            child: Text(
-              '${currentHealth.toInt()} / ${maxHealth.toInt()}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-                shadows: [
-                  Shadow(color: Colors.black, blurRadius: 3),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

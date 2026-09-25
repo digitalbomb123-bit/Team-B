@@ -63,6 +63,15 @@ class PlayerComponent extends PositionComponent with HasGameReference {
   double _jetpackCooldownTimer = 0.0;
   static const double jetpackRechargeDelay = 0.5; // Refill delay in seconds
 
+  // Super Jetpack Fuel (Map Pickup lasting up to 10 seconds)
+  double superFuelTimer = 0.0;
+  bool get hasSuperFuel => superFuelTimer > 0.0;
+
+  void applySuperFuel(double duration) {
+    superFuelTimer = max(superFuelTimer, duration);
+    jetpackFuel = maxJetpackFuel;
+  }
+
   // Fart Bomb & Toxic Mechanics
   int fartBombCount = 0;
   double fartAnimationTimer = 0.0;
@@ -155,12 +164,17 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     _animTime += dt;
 
     // --- JETPACK FLIGHT & AUTOMATIC FUEL REFILL ---
-    if (isFlying && jetpackFuel > 0) {
-      jetpackFuel = max(0.0, jetpackFuel - jetpackBurnRate * dt);
+    if (isFlying && (jetpackFuel > 0 || superFuelTimer > 0)) {
+      if (superFuelTimer > 0) {
+        superFuelTimer = max(0.0, superFuelTimer - dt);
+        jetpackFuel = maxJetpackFuel; // Maintain full standard fuel during super boost
+      } else {
+        jetpackFuel = max(0.0, jetpackFuel - jetpackBurnRate * dt);
+      }
       _jetpackCooldownTimer = jetpackRechargeDelay;
       velocity.y = max(maxFlySpeed, velocity.y + jetpackThrust * dt);
       isGrounded = false;
-      if (jetpackFuel <= 0) {
+      if (jetpackFuel <= 0 && superFuelTimer <= 0) {
         isFlying = false;
       }
     } else {
@@ -191,7 +205,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       isFlying = false;
       return;
     }
-    if (flying && jetpackFuel > 0) {
+    if (flying && (jetpackFuel > 0 || superFuelTimer > 0)) {
       isFlying = true;
       isGrounded = false;
     } else {
@@ -251,6 +265,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     isDead = true;
     fartAnimationTimer = 0.0;
     poisonFlashTimer = 0.0;
+    superFuelTimer = 0.0;
     health = 0.0;
     velocity.setZero();
     currentAnimation = PlayerAnimState.death;
@@ -326,8 +341,8 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     // Translate local origin to the soldier's feet (Anchor.bottomCenter)
     canvas.translate(size.x / 2, size.y);
 
-    // Render nameplate and mini health bar (unflipped)
-    _renderNameAndHealthBar(canvas);
+    // Render name tag only (health and fuel are shown in the top-left HUD)
+    _renderNameTag(canvas);
 
     // Apply facing flip
     canvas.scale(facingDirection, 1.0);
@@ -485,13 +500,14 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     canvas.drawRRect(nozzleRect, paintJetpackDetail);
 
     // Fiery rocket flame exhaust when flying!
-    if (isFlying && jetpackFuel > 0) {
+    if (isFlying && (jetpackFuel > 0 || superFuelTimer > 0)) {
       final flicker = sin(_animTime * 35.0) * 3.5;
-      final flameLen = 16.0 + flicker;
+      final isSuper = superFuelTimer > 0;
+      final flameLen = (isSuper ? 24.0 : 16.0) + flicker;
 
-      // Outer plasma flame (orange/red glow)
+      // Outer plasma flame (orange/red glow or electric cyan in super mode)
       final paintOuterFlame = Paint()
-        ..color = const Color(0xFFFF5722)
+        ..color = isSuper ? const Color(0xFF00E5FF) : const Color(0xFFFF5722)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
       final outerPath = Path()
         ..moveTo(-15, 2)
@@ -501,7 +517,8 @@ class PlayerComponent extends PositionComponent with HasGameReference {
       canvas.drawPath(outerPath, paintOuterFlame);
 
       // Inner white/yellow fiery core
-      final paintInnerFlame = Paint()..color = const Color(0xFFFFEB3B);
+      final paintInnerFlame = Paint()
+        ..color = isSuper ? Colors.white : const Color(0xFFFFEB3B);
       final innerPath = Path()
         ..moveTo(-14, 2)
         ..lineTo(-10, 2)
@@ -622,67 +639,9 @@ class PlayerComponent extends PositionComponent with HasGameReference {
     canvas.restore();
   }
 
-  /// Render Name Tag and Mini Health Bar above the player's head
-  void _renderNameAndHealthBar(Canvas canvas) {
-    const double barWidth = 38.0;
-    const double barHeight = 4.5;
+  /// Render Name Tag above the player's head (without overhead health/fuel bars)
+  void _renderNameTag(Canvas canvas) {
     const double topOffset = -66.0;
-
-    // Health Bar Background
-    final paintBg = Paint()..color = Colors.black.withValues(alpha: 0.65);
-    final rectBg = Rect.fromCenter(
-      center: const Offset(0, topOffset),
-      width: barWidth,
-      height: barHeight,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rectBg, const Radius.circular(2)),
-      paintBg,
-    );
-
-    // Current Health Fill
-    final healthRatio = (health / maxHealth).clamp(0.0, 1.0);
-    final fillWidth = barWidth * healthRatio;
-    final healthColor = healthRatio > 0.5
-        ? const Color(0xFF22C55E) // Green
-        : (healthRatio > 0.25 ? const Color(0xFFEAB308) : const Color(0xFFEF4444)); // Yellow / Red
-
-    final paintFill = Paint()..color = healthColor;
-    final rectFill = Rect.fromLTWH(
-      -barWidth / 2,
-      topOffset - barHeight / 2,
-      fillWidth,
-      barHeight,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rectFill, const Radius.circular(2)),
-      paintFill,
-    );
-
-    // Mini Jetpack Fuel Bar (Directly below health bar)
-    const double fuelOffset = -59.5;
-    final fuelRectBg = Rect.fromCenter(
-      center: const Offset(0, fuelOffset),
-      width: barWidth,
-      height: 2.2,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(fuelRectBg, const Radius.circular(1)),
-      paintBg,
-    );
-    final fuelRatio = (jetpackFuel / maxJetpackFuel).clamp(0.0, 1.0);
-    final fuelFillWidth = barWidth * fuelRatio;
-    final paintFuel = Paint()..color = const Color(0xFFF97316); // Jetpack flame orange
-    final rectFuelFill = Rect.fromLTWH(
-      -barWidth / 2,
-      fuelOffset - 1.1,
-      fuelFillWidth,
-      2.2,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rectFuelFill, const Radius.circular(1)),
-      paintFuel,
-    );
 
     // Name Text Tag
     final textPainter = TextPainter(
@@ -702,7 +661,7 @@ class PlayerComponent extends PositionComponent with HasGameReference {
 
     textPainter.paint(
       canvas,
-      Offset(-textPainter.width / 2, topOffset - 14),
+      Offset(-textPainter.width / 2, topOffset),
     );
   }
 }

@@ -17,8 +17,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
   static const String defaultServerUrl = 'wss://team-b-6hro.onrender.com';
 
   int _selectedCharacterId = 1;
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Soldier');
   final TextEditingController _roomController =
       TextEditingController(text: 'ARENA-1');
   final TextEditingController _serverController =
@@ -32,7 +30,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _roomController.dispose();
     _serverController.dispose();
     _scrollController.dispose();
@@ -40,9 +37,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   void _startGame() {
-    final name = _nameController.text.trim().isEmpty
-        ? 'Hero'
-        : _nameController.text.trim();
+    final selectedDef = CharacterRegistry.getById(_selectedCharacterId);
+    final name = selectedDef.name;
 
     final room = _roomController.text.trim().isEmpty
         ? 'ARENA-1'
@@ -240,39 +236,43 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
                                   SizedBox(height: isCompactHeight ? 6 : 10),
 
-                                  // Name input
-                                  TextField(
-                                    controller: _nameController,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: isCompactHeight ? 12 : 13,
+                                  // Selected Avatar Name Badge (Automatic)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: isCompactHeight ? 6 : 8,
                                     ),
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: isCompactHeight ? 7 : 10,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0F172A),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+                                        width: 1.2,
                                       ),
-                                      labelText: 'Callsign / Name',
-                                      labelStyle: TextStyle(
-                                        color: const Color(0xFF94A3B8),
-                                        fontSize: isCompactHeight ? 11 : 12,
-                                      ),
-                                      filled: true,
-                                      fillColor: const Color(0xFF0F172A),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.person_pin_rounded,
                                           color: Color(0xFF38BDF8),
+                                          size: 15,
                                         ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF38BDF8),
-                                          width: 1.5,
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            selectedDef.name,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: isCompactHeight ? 12 : 14,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
                                   ),
 

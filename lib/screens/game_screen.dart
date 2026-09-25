@@ -51,7 +51,8 @@ class _GameScreenState extends State<GameScreen> {
 
   // Local HUD Reactive State
   final ValueNotifier<double> _healthNotifier = ValueNotifier<double>(100.0);
-  final ValueNotifier<double> _fuelNotifier = ValueNotifier<double>(100.0);
+  final ValueNotifier<({double fuel, bool isSuperFuel})> _fuelNotifier =
+      ValueNotifier((fuel: 100.0, isSuperFuel: false));
   final ValueNotifier<({int kills, int deaths})> _scoreNotifier =
       ValueNotifier((kills: 0, deaths: 0));
   final ValueNotifier<int> _fartBombNotifier = ValueNotifier<int>(0);
@@ -103,11 +104,12 @@ class _GameScreenState extends State<GameScreen> {
       }
     };
 
-    _game.onFuelChanged = (fuel, maxFuel) {
-      if (_fuelNotifier.value != fuel) {
+    _game.onFuelChanged = (fuel, maxFuel, isSuperFuel) {
+      if (_fuelNotifier.value.fuel != fuel ||
+          _fuelNotifier.value.isSuperFuel != isSuperFuel) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            _fuelNotifier.value = fuel;
+            _fuelNotifier.value = (fuel: fuel, isSuperFuel: isSuperFuel);
           }
         });
       }
@@ -502,9 +504,9 @@ class _GameScreenState extends State<GameScreen> {
                         child: ValueListenableBuilder<double>(
                           valueListenable: _healthNotifier,
                           builder: (context, health, _) {
-                            return ValueListenableBuilder<double>(
+                            return ValueListenableBuilder<({double fuel, bool isSuperFuel})>(
                               valueListenable: _fuelNotifier,
-                              builder: (context, fuel, _) {
+                              builder: (context, fuelState, _) {
                                 return ValueListenableBuilder<({int kills, int deaths})>(
                                   valueListenable: _scoreNotifier,
                                   builder: (context, score, _) {
@@ -517,8 +519,9 @@ class _GameScreenState extends State<GameScreen> {
                                             return GameHud(
                                               currentHealth: health,
                                               maxHealth: 100.0,
-                                              currentFuel: fuel,
+                                              currentFuel: fuelState.fuel,
                                               maxFuel: 100.0,
+                                              isSuperFuel: fuelState.isSuperFuel,
                                               kills: score.kills,
                                               deaths: score.deaths,
                                               characterId: widget.characterId,

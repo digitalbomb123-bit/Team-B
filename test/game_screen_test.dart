@@ -46,7 +46,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // Verify HUD & Dual Joystick elements are rendered
-    expect(find.text('Soldier'), findsWidgets);
+    expect(find.text('Nandhu'), findsWidgets);
     expect(find.text('FART BOMB'), findsOneWidget);
     expect(find.text('AIM & FIRE'), findsOneWidget);
     expect(find.text('MOVE / FLY'), findsOneWidget);
